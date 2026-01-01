@@ -32,6 +32,14 @@ api.get('/teams', async (c) => {
   return c.json(results);
 });
 
+// ==================== Meeting Types ====================
+api.get('/meeting-types', async (c) => {
+  const { results } = await c.env.DB.prepare(
+    'SELECT * FROM meeting_types ORDER BY id'
+  ).all();
+  return c.json(results);
+});
+
 // ==================== Clients ====================
 api.get('/clients', async (c) => {
   const teamId = c.req.query('team_id');

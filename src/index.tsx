@@ -91,9 +91,14 @@ const renderPage = (title: string, content: string, scripts: string = '') => `
 // Home page - Meeting list
 app.get('/', (c) => {
   const content = `
-    <div class="mb-6">
-      <h1 class="text-2xl font-bold text-gray-800 mb-2">今週の会議</h1>
-      <p class="text-gray-600">参加予定の会議を確認し、会議室にアクセスしましょう</p>
+    <div class="mb-6 flex items-center justify-between">
+      <div>
+        <h1 class="text-2xl font-bold text-gray-800 mb-2">今週の会議</h1>
+        <p class="text-gray-600">参加予定の会議を確認し、会議室にアクセスしましょう</p>
+      </div>
+      <button onclick="openCreateMeetingModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center">
+        <i class="fas fa-plus mr-2"></i>会議を作成
+      </button>
     </div>
     
     <!-- Meeting Type Filters -->
@@ -109,11 +114,96 @@ app.get('/', (c) => {
     <div id="meeting-list" class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       <div class="text-center py-8 text-gray-500">読み込み中...</div>
     </div>
+    
+    <!-- Create Meeting Modal -->
+    <div id="create-meeting-modal" class="modal">
+      <div class="modal-content p-6" style="max-width: 40rem;">
+        <h3 class="text-lg font-bold mb-4"><i class="fas fa-calendar-plus mr-2 text-blue-600"></i>新しい会議を作成</h3>
+        <form id="create-meeting-form">
+          
+          <!-- Meeting Type Selection -->
+          <div class="mb-6">
+            <label class="block text-sm font-medium text-gray-700 mb-3">会議の種類</label>
+            <div class="grid grid-cols-2 gap-3" id="meeting-type-selector">
+              <label class="meeting-type-option cursor-pointer">
+                <input type="radio" name="meeting_type" value="1" class="hidden" onchange="onMeetingTypeChange(this)">
+                <div class="border-2 rounded-lg p-4 hover:border-green-400 transition-colors border-l-4 border-l-green-500">
+                  <div class="flex items-center mb-2">
+                    <i class="fas fa-users text-green-500 mr-2"></i>
+                    <span class="font-semibold text-gray-800">チームMTG</span>
+                  </div>
+                  <p class="text-xs text-gray-500">週1回、常駐先単位で施策進捗・品質・来週コミット・提案のタネを整理</p>
+                </div>
+              </label>
+              <label class="meeting-type-option cursor-pointer">
+                <input type="radio" name="meeting_type" value="2" class="hidden" onchange="onMeetingTypeChange(this)">
+                <div class="border-2 rounded-lg p-4 hover:border-blue-400 transition-colors border-l-4 border-l-blue-500">
+                  <div class="flex items-center mb-2">
+                    <i class="fas fa-building text-blue-500 mr-2"></i>
+                    <span class="font-semibold text-gray-800">本部会議</span>
+                  </div>
+                  <p class="text-xs text-gray-500">リーダー/副リーダー。会社決定の共有・運用統制・横断詰まり解消</p>
+                </div>
+              </label>
+              <label class="meeting-type-option cursor-pointer">
+                <input type="radio" name="meeting_type" value="3" class="hidden" onchange="onMeetingTypeChange(this)">
+                <div class="border-2 rounded-lg p-4 hover:border-purple-400 transition-colors border-l-4 border-l-purple-500">
+                  <div class="flex items-center mb-2">
+                    <i class="fas fa-chess text-purple-500 mr-2"></i>
+                    <span class="font-semibold text-gray-800">戦略会議</span>
+                  </div>
+                  <p class="text-xs text-gray-500">V2。優先順位・配分・トレードオフ・重大判断に集中</p>
+                </div>
+              </label>
+              <label class="meeting-type-option cursor-pointer">
+                <input type="radio" name="meeting_type" value="4" class="hidden" onchange="onMeetingTypeChange(this)">
+                <div class="border-2 rounded-lg p-4 hover:border-orange-400 transition-colors border-l-4 border-l-orange-500">
+                  <div class="flex items-center mb-2">
+                    <i class="fas fa-globe text-orange-500 mr-2"></i>
+                    <span class="font-semibold text-gray-800">全体会議</span>
+                  </div>
+                  <p class="text-xs text-gray-500">月1回、本部決定の要点共有、月次振り返り、横展開</p>
+                </div>
+              </label>
+            </div>
+          </div>
+          
+          <!-- Team Selection (for Team MTG only) -->
+          <div class="mb-4" id="team-select-container" style="display: none;">
+            <label class="block text-sm font-medium text-gray-700 mb-2">対象チーム</label>
+            <select id="meeting-team" class="w-full border rounded-lg px-3 py-2">
+              <option value="">チームを選択してください</option>
+            </select>
+          </div>
+          
+          <!-- Meeting Title -->
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">会議タイトル</label>
+            <input type="text" id="meeting-title" class="w-full border rounded-lg px-3 py-2" placeholder="例: Alpha チームMTG 第1週" required>
+          </div>
+          
+          <!-- Meeting Date/Time -->
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">開催日時</label>
+            <input type="datetime-local" id="meeting-datetime" class="w-full border rounded-lg px-3 py-2" required>
+          </div>
+          
+          <!-- Buttons -->
+          <div class="flex justify-end space-x-2 mt-6">
+            <button type="button" onclick="closeCreateMeetingModal()" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">キャンセル</button>
+            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+              <i class="fas fa-check mr-2"></i>作成
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   `;
   
   const scripts = `
     <script>
       let allMeetings = [];
+      let allTeams = [];
       let currentFilter = '';
       
       async function loadMeetings() {
@@ -124,6 +214,20 @@ app.get('/', (c) => {
         } catch (err) {
           console.error(err);
           document.getElementById('meeting-list').innerHTML = '<div class="text-red-500">読み込みエラー</div>';
+        }
+      }
+      
+      async function loadTeams() {
+        try {
+          const res = await axios.get('/api/teams');
+          allTeams = res.data;
+          const select = document.getElementById('meeting-team');
+          select.innerHTML = '<option value="">チームを選択してください</option>';
+          allTeams.forEach(t => {
+            select.innerHTML += \`<option value="\${t.id}">\${t.name}</option>\`;
+          });
+        } catch (err) {
+          console.error(err);
         }
       }
       
@@ -192,7 +296,118 @@ app.get('/', (c) => {
         document.getElementById('meeting-list').innerHTML = html;
       }
       
+      // Create Meeting Modal
+      function openCreateMeetingModal() {
+        // Set default datetime to now + 1 hour
+        const now = new Date();
+        now.setHours(now.getHours() + 1);
+        now.setMinutes(0);
+        const localDatetime = now.toISOString().slice(0, 16);
+        document.getElementById('meeting-datetime').value = localDatetime;
+        
+        // Reset form
+        document.getElementById('create-meeting-form').reset();
+        document.getElementById('meeting-datetime').value = localDatetime;
+        document.getElementById('team-select-container').style.display = 'none';
+        
+        // Clear selection styling
+        document.querySelectorAll('.meeting-type-option > div').forEach(div => {
+          div.classList.remove('border-blue-500', 'bg-blue-50');
+        });
+        
+        document.getElementById('create-meeting-modal').classList.add('active');
+      }
+      
+      function closeCreateMeetingModal() {
+        document.getElementById('create-meeting-modal').classList.remove('active');
+      }
+      
+      function onMeetingTypeChange(radio) {
+        // Update visual selection
+        document.querySelectorAll('.meeting-type-option > div').forEach(div => {
+          div.classList.remove('border-blue-500', 'bg-blue-50');
+        });
+        radio.parentElement.querySelector('div').classList.add('border-blue-500', 'bg-blue-50');
+        
+        // Show/hide team selector
+        const teamContainer = document.getElementById('team-select-container');
+        if (radio.value === '1') { // Team MTG
+          teamContainer.style.display = 'block';
+        } else {
+          teamContainer.style.display = 'none';
+        }
+        
+        // Auto-generate title suggestion
+        const typeNames = {
+          '1': 'チームMTG',
+          '2': '本部会議',
+          '3': '戦略会議',
+          '4': '全体会議'
+        };
+        const today = dayjs();
+        const weekNum = Math.ceil(today.date() / 7);
+        let suggestedTitle = \`\${typeNames[radio.value]} 第\${weekNum}週\`;
+        
+        if (radio.value === '4') { // All-hands
+          suggestedTitle = \`全体会議 \${today.format('M')}月\`;
+        }
+        
+        document.getElementById('meeting-title').value = suggestedTitle;
+      }
+      
+      document.getElementById('create-meeting-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const meetingTypeRadio = document.querySelector('input[name="meeting_type"]:checked');
+        if (!meetingTypeRadio) {
+          alert('会議の種類を選択してください');
+          return;
+        }
+        
+        const meetingTypeId = parseInt(meetingTypeRadio.value);
+        const teamId = document.getElementById('meeting-team').value;
+        const title = document.getElementById('meeting-title').value.trim();
+        const datetime = document.getElementById('meeting-datetime').value;
+        
+        // Validate team selection for Team MTG
+        if (meetingTypeId === 1 && !teamId) {
+          alert('チームMTGの場合はチームを選択してください');
+          return;
+        }
+        
+        if (!title) {
+          alert('タイトルを入力してください');
+          return;
+        }
+        
+        // Generate slug from title
+        const slug = title.toLowerCase()
+          .replace(/[^a-z0-9\\u3040-\\u309f\\u30a0-\\u30ff\\u4e00-\\u9faf]+/g, '-')
+          .replace(/^-|-$/g, '') + '-' + Date.now();
+        
+        try {
+          const res = await axios.post('/api/meetings', {
+            organization_id: 1, // Default org
+            team_id: teamId ? parseInt(teamId) : null,
+            meeting_type_id: meetingTypeId,
+            title: title,
+            slug: slug,
+            scheduled_at: datetime
+          });
+          
+          closeCreateMeetingModal();
+          
+          // Redirect to the new meeting
+          window.location.href = \`/meeting/\${res.data.id}\`;
+        } catch (err) {
+          console.error(err);
+          alert('会議の作成に失敗しました');
+        }
+      });
+      
+      // Initialize
       loadMeetings();
+      loadTeams();
     </script>
   `;
   
