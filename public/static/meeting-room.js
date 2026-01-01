@@ -1,7 +1,8 @@
 // VEXUM Meeting OS - Meeting Room JavaScript
 
-// Current user (in production, this would come from auth)
-const currentUser = { id: 1, name: '田中 太郎', role: 'manager' };
+// Current user permissions (loaded from global auth state)
+let meetingUser = null;
+let canManageCurrentMeeting = false;
 
 // Labels
 const statusLabels = {
@@ -47,6 +48,19 @@ async function initMeetingRoom() {
   const meetingId = document.getElementById('meeting-room').dataset.meetingId;
   
   try {
+    // Wait for auth state to be loaded
+    if (!window.currentUser) {
+      await loadCurrentUser();
+    }
+    
+    // Check if logged in
+    if (!window.currentUser) {
+      renderLoginRequired();
+      return;
+    }
+    
+    meetingUser = window.currentUser;
+    
     // Load users first
     const usersRes = await axios.get('/api/users');
     users = usersRes.data;
@@ -54,17 +68,62 @@ async function initMeetingRoom() {
     // Load meeting data
     const res = await axios.get(`/api/meetings/${meetingId}`);
     meeting = res.data;
+    
+    // Check if user can view this meeting type
+    const canView = canViewMeetingType(meeting.meeting_type_slug);
+    if (!canView) {
+      renderAccessDenied();
+      return;
+    }
+    
+    // Check if user can manage this meeting type
+    canManageCurrentMeeting = canManageMeetingType(meeting.meeting_type_slug);
+    
     renderMeetingRoom();
   } catch (err) {
     console.error(err);
-    document.getElementById('meeting-room').innerHTML = '<div class="text-red-500 p-4">会議データの読み込みに失敗しました</div>';
+    if (err.response?.status === 404) {
+      document.getElementById('meeting-room').innerHTML = '<div class="text-red-500 p-4">会議が見つかりません</div>';
+    } else if (err.response?.status === 403) {
+      renderAccessDenied();
+    } else {
+      document.getElementById('meeting-room').innerHTML = '<div class="text-red-500 p-4">会議データの読み込みに失敗しました</div>';
+    }
   }
+}
+
+// Render login required message
+function renderLoginRequired() {
+  document.getElementById('meeting-room').innerHTML = `
+    <div class="bg-white rounded-lg shadow-sm p-8 text-center">
+      <i class="fas fa-lock text-4xl text-gray-300 mb-4"></i>
+      <h2 class="text-xl font-semibold text-gray-700 mb-2">ログインが必要です</h2>
+      <p class="text-gray-500 mb-4">この会議室にアクセスするにはログインしてください</p>
+      <button onclick="openLoginModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+        <i class="fas fa-sign-in-alt mr-2"></i>ログイン
+      </button>
+    </div>
+  `;
+}
+
+// Render access denied message
+function renderAccessDenied() {
+  document.getElementById('meeting-room').innerHTML = `
+    <div class="bg-white rounded-lg shadow-sm p-8 text-center">
+      <i class="fas fa-ban text-4xl text-red-300 mb-4"></i>
+      <h2 class="text-xl font-semibold text-gray-700 mb-2">アクセス権限がありません</h2>
+      <p class="text-gray-500 mb-4">この会議にアクセスする権限がありません</p>
+      <a href="/" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 inline-block">
+        <i class="fas fa-home mr-2"></i>会議一覧に戻る
+      </a>
+    </div>
+  `;
 }
 
 // Main render function
 function renderMeetingRoom() {
   const typeSlug = meeting.meeting_type_slug;
-  const isManager = currentUser.role === 'manager';
+  const isManager = canManageCurrentMeeting;
   
   const html = `
     <!-- Meeting Header -->
@@ -165,7 +224,7 @@ async function submitQuickCapture() {
     await axios.post('/api/quick-capture', {
       meeting_id: meeting.id,
       input: value,
-      created_by: currentUser.id
+      created_by: meetingUser.id
     });
     input.value = '';
     refreshMeeting();
@@ -178,7 +237,7 @@ async function submitQuickCapture() {
 // Agenda Section
 function renderAgendaSection() {
   const items = meeting.agenda_items || [];
-  const isManager = currentUser.role === 'manager';
+  const isManager = canManageCurrentMeeting;
   
   return `
     <div class="bg-white rounded-lg shadow-sm">
@@ -210,7 +269,7 @@ function renderAgendaSection() {
 // Decision Section
 function renderDecisionSection() {
   const items = meeting.decisions || [];
-  const isManager = currentUser.role === 'manager';
+  const isManager = canManageCurrentMeeting;
   
   return `
     <div class="bg-white rounded-lg shadow-sm">
@@ -252,7 +311,7 @@ function renderDecisionSection() {
 // Action Section
 function renderActionSection() {
   const items = meeting.actions || [];
-  const isManager = currentUser.role === 'manager';
+  const isManager = canManageCurrentMeeting;
   
   return `
     <div class="bg-white rounded-lg shadow-sm">
@@ -279,7 +338,7 @@ function renderActionSection() {
                 ${item.waiting_reason ? `<div class="text-sm text-red-500 mt-1"><i class="fas fa-hourglass-half mr-1"></i>${item.waiting_reason}</div>` : ''}
               </div>
               <div class="flex items-center space-x-2">
-                <select onchange="updateActionStatus(${item.id}, this.value)" class="text-xs border rounded px-2 py-1" ${!isManager && item.assignee_id !== currentUser.id ? 'disabled' : ''}>
+                <select onchange="updateActionStatus(${item.id}, this.value)" class="text-xs border rounded px-2 py-1" ${!isManager && item.assignee_id !== meetingUser.id ? 'disabled' : ''}>
                   ${Object.entries(statusLabels).map(([k, v]) => `<option value="${k}" ${item.status === k ? 'selected' : ''}>${v}</option>`).join('')}
                 </select>
                 ${isManager ? `
@@ -340,7 +399,7 @@ function renderIssueSection() {
 // Link Section
 function renderLinkSection() {
   const items = meeting.links || [];
-  const isManager = currentUser.role === 'manager';
+  const isManager = canManageCurrentMeeting;
   
   return `
     <div class="bg-white rounded-lg shadow-sm">
@@ -829,7 +888,7 @@ async function confirmDecision(id) {
   try {
     await axios.patch(`/api/decisions/${id}`, { 
       is_confirmed: 1, 
-      confirmed_by: currentUser.id 
+      confirmed_by: meetingUser.id 
     });
     refreshMeeting();
   } catch (err) {
@@ -850,7 +909,7 @@ async function convertIssueToAction(issueId) {
   try {
     await axios.post(`/api/issues/${issueId}/convert-to-action`, {
       meeting_id: meeting.id,
-      created_by: currentUser.id
+      created_by: meetingUser.id
     });
     refreshMeeting();
   } catch (err) {
@@ -916,7 +975,7 @@ document.getElementById('checkin-form').addEventListener('submit', async (e) => 
   
   const data = {
     meeting_id: meeting.id,
-    user_id: currentUser.id,
+    user_id: meetingUser.id,
     confidence_score: parseInt(document.getElementById('confidence-score').value),
     uncertainty_factor: document.getElementById('uncertainty-factor').value,
     needs_help: document.getElementById('needs-help').checked,
@@ -1093,14 +1152,14 @@ document.getElementById('quick-add-form').addEventListener('submit', async (e) =
         await axios.post('/api/agenda-items', {
           meeting_id: meeting.id,
           content,
-          created_by: currentUser.id
+          created_by: meetingUser.id
         });
         break;
       case 'decision':
         await axios.post('/api/decisions', {
           meeting_id: meeting.id,
           content,
-          created_by: currentUser.id
+          created_by: meetingUser.id
         });
         break;
       case 'action':
@@ -1111,7 +1170,7 @@ document.getElementById('quick-add-form').addEventListener('submit', async (e) =
           content,
           assignee_id: assigneeId ? parseInt(assigneeId) : null,
           due_date: dueDate || null,
-          created_by: currentUser.id
+          created_by: meetingUser.id
         });
         break;
       case 'issue':
@@ -1122,7 +1181,7 @@ document.getElementById('quick-add-form').addEventListener('submit', async (e) =
           team_id: meeting.team_id,
           content,
           state,
-          created_by: currentUser.id
+          created_by: meetingUser.id
         });
         break;
       case 'link':
@@ -1131,7 +1190,7 @@ document.getElementById('quick-add-form').addEventListener('submit', async (e) =
           meeting_id: meeting.id,
           url: content,
           title: title || null,
-          created_by: currentUser.id
+          created_by: meetingUser.id
         });
         break;
       case 'broadcast':
@@ -1144,14 +1203,14 @@ document.getElementById('quick-add-form').addEventListener('submit', async (e) =
           content,
           effective_date: effectiveDate || null,
           target_team_ids: targetTeamIds,
-          created_by: currentUser.id
+          created_by: meetingUser.id
         });
         break;
       case 'rule_update':
         await axios.post('/api/rule-updates', {
           meeting_id: meeting.id,
           change_description: content,
-          created_by: currentUser.id
+          created_by: meetingUser.id
         });
         break;
       case 'priority':
@@ -1213,7 +1272,7 @@ async function addInitiative(clientId) {
       meeting_id: meeting.id,
       name,
       dod,
-      created_by: currentUser.id
+      created_by: meetingUser.id
     });
     refreshMeeting();
   } catch (err) {
@@ -1231,7 +1290,7 @@ async function addProposalSeed(clientId) {
       client_id: clientId,
       meeting_id: meeting.id,
       memo,
-      created_by: currentUser.id
+      created_by: meetingUser.id
     });
     refreshMeeting();
   } catch (err) {

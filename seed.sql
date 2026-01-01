@@ -16,9 +16,12 @@ INSERT OR IGNORE INTO teams (id, organization_id, name) VALUES
   (2, 1, 'Beta'),
   (3, 1, 'Gamma');
 
--- Insert demo users
+-- Insert demo users with role hierarchy
+-- executive: トップ層（戦略会議にアクセス可能）
+-- manager: リーダー/副リーダー（本部会議にアクセス可能）
+-- participant: 一般メンバー（チームMTGのみ）
 INSERT OR IGNORE INTO users (id, organization_id, email, name, role) VALUES
-  (1, 1, 'tanaka@vexum.co.jp', '田中 太郎', 'manager'),
+  (1, 1, 'tanaka@vexum.co.jp', '田中 太郎', 'executive'),
   (2, 1, 'yamada@vexum.co.jp', '山田 花子', 'manager'),
   (3, 1, 'suzuki@vexum.co.jp', '鈴木 一郎', 'participant'),
   (4, 1, 'sato@vexum.co.jp', '佐藤 美咲', 'participant'),

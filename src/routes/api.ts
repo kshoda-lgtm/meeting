@@ -1,16 +1,148 @@
 import { Hono } from 'hono';
+import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
 import type { D1Database } from '@cloudflare/workers-types';
 
 type Bindings = {
   DB: D1Database;
 };
 
+type UserRole = 'participant' | 'manager' | 'executive';
+
+interface CurrentUser {
+  id: number;
+  name: string;
+  email: string;
+  role: UserRole;
+  organization_id: number;
+}
+
 const api = new Hono<{ Bindings: Bindings }>();
+
+// ==================== Auth Helpers ====================
+function generateSessionToken(): string {
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let token = '';
+  for (let i = 0; i < 64; i++) {
+    token += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return token;
+}
+
+async function getCurrentUser(c: any): Promise<CurrentUser | null> {
+  const sessionToken = getCookie(c, 'session_token');
+  if (!sessionToken) return null;
+  
+  const session = await c.env.DB.prepare(`
+    SELECT u.* FROM users u
+    JOIN user_sessions s ON u.id = s.user_id
+    WHERE s.session_token = ? AND s.expires_at > datetime('now')
+  `).bind(sessionToken).first();
+  
+  return session as CurrentUser | null;
+}
+
+// Role hierarchy check
+function hasRoleAccess(userRole: UserRole, requiredRole: UserRole): boolean {
+  const hierarchy: Record<UserRole, number> = {
+    participant: 1,
+    manager: 2,
+    executive: 3
+  };
+  return hierarchy[userRole] >= hierarchy[requiredRole];
+}
+
+// ==================== Auth Endpoints ====================
+// Login (simple email-based for demo)
+api.post('/auth/login', async (c) => {
+  const body = await c.req.json();
+  const { email } = body;
+  
+  const user = await c.env.DB.prepare(
+    'SELECT * FROM users WHERE email = ?'
+  ).bind(email).first();
+  
+  if (!user) {
+    return c.json({ error: 'ユーザーが見つかりません' }, 401);
+  }
+  
+  // Create session
+  const token = generateSessionToken();
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 days
+  
+  await c.env.DB.prepare(
+    'INSERT INTO user_sessions (user_id, session_token, expires_at) VALUES (?, ?, ?)'
+  ).bind(user.id, token, expiresAt).run();
+  
+  // Set cookie
+  setCookie(c, 'session_token', token, {
+    path: '/',
+    httpOnly: true,
+    secure: false, // Set to true in production with HTTPS
+    maxAge: 7 * 24 * 60 * 60,
+    sameSite: 'Lax'
+  });
+  
+  return c.json({
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      organization_id: user.organization_id
+    }
+  });
+});
+
+api.post('/auth/logout', async (c) => {
+  const sessionToken = getCookie(c, 'session_token');
+  if (sessionToken) {
+    await c.env.DB.prepare(
+      'DELETE FROM user_sessions WHERE session_token = ?'
+    ).bind(sessionToken).run();
+  }
+  deleteCookie(c, 'session_token', { path: '/' });
+  return c.json({ success: true });
+});
+
+api.get('/auth/me', async (c) => {
+  const user = await getCurrentUser(c);
+  if (!user) {
+    return c.json({ user: null });
+  }
+  
+  // Get user's teams
+  const teams = await c.env.DB.prepare(`
+    SELECT t.*, tm.role as team_role FROM teams t
+    JOIN team_members tm ON t.id = tm.team_id
+    WHERE tm.user_id = ?
+  `).bind(user.id).all();
+  
+  // Get accessible meeting types based on role
+  const permissions = await c.env.DB.prepare(`
+    SELECT mt.*, mtp.can_view, mtp.can_create, mtp.can_manage
+    FROM meeting_types mt
+    JOIN meeting_type_permissions mtp ON mt.id = mtp.meeting_type_id
+    WHERE mtp.role = ? AND mtp.can_view = 1
+    ORDER BY mt.id
+  `).bind(user.role).all();
+  
+  return c.json({
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      organization_id: user.organization_id
+    },
+    teams: teams.results,
+    accessible_meeting_types: permissions.results
+  });
+});
 
 // ==================== Users ====================
 api.get('/users', async (c) => {
   const { results } = await c.env.DB.prepare(
-    'SELECT * FROM users ORDER BY name'
+    'SELECT id, name, email, role, organization_id FROM users ORDER BY name'
   ).all();
   return c.json(results);
 });
@@ -18,7 +150,7 @@ api.get('/users', async (c) => {
 api.get('/users/:id', async (c) => {
   const id = c.req.param('id');
   const result = await c.env.DB.prepare(
-    'SELECT * FROM users WHERE id = ?'
+    'SELECT id, name, email, role, organization_id FROM users WHERE id = ?'
   ).bind(id).first();
   if (!result) return c.json({ error: 'User not found' }, 404);
   return c.json(result);
@@ -34,9 +166,25 @@ api.get('/teams', async (c) => {
 
 // ==================== Meeting Types ====================
 api.get('/meeting-types', async (c) => {
-  const { results } = await c.env.DB.prepare(
-    'SELECT * FROM meeting_types ORDER BY id'
-  ).all();
+  const user = await getCurrentUser(c);
+  
+  // If not logged in, return all types (for login page)
+  if (!user) {
+    const { results } = await c.env.DB.prepare(
+      'SELECT * FROM meeting_types ORDER BY id'
+    ).all();
+    return c.json(results);
+  }
+  
+  // Return only accessible types for logged-in user
+  const { results } = await c.env.DB.prepare(`
+    SELECT mt.*, mtp.can_view, mtp.can_create, mtp.can_manage
+    FROM meeting_types mt
+    JOIN meeting_type_permissions mtp ON mt.id = mtp.meeting_type_id
+    WHERE mtp.role = ?
+    ORDER BY mt.id
+  `).bind(user.role).all();
+  
   return c.json(results);
 });
 
@@ -89,9 +237,15 @@ api.patch('/clients/:id', async (c) => {
 
 // ==================== Meetings ====================
 api.get('/meetings', async (c) => {
+  const user = await getCurrentUser(c);
   const typeSlug = c.req.query('type');
   const teamId = c.req.query('team_id');
   const status = c.req.query('status');
+  
+  // If not logged in, return empty array (require login to see meetings)
+  if (!user) {
+    return c.json([]);
+  }
   
   let query = `
     SELECT m.*, mt.name as meeting_type_name, mt.slug as meeting_type_slug, t.name as team_name
@@ -101,6 +255,21 @@ api.get('/meetings', async (c) => {
     WHERE 1=1
   `;
   const params: any[] = [];
+  
+  // Filter by user's accessible meeting types
+  query += ` AND m.meeting_type_id IN (
+    SELECT meeting_type_id FROM meeting_type_permissions 
+    WHERE role = ? AND can_view = 1
+  )`;
+  params.push(user.role);
+  
+  // For participant, also filter by their team membership
+  if (user.role === 'participant') {
+    query += ` AND (m.team_id IN (
+      SELECT team_id FROM team_members WHERE user_id = ?
+    ) OR m.team_id IS NULL)`;
+    params.push(user.id);
+  }
   
   if (typeSlug) {
     query += ' AND mt.slug = ?';

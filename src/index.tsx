@@ -33,6 +33,115 @@ const renderPage = (title: string, content: string, scripts: string = '') => `
     <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/dayjs.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/locale/ja.js"></script>
     <script>dayjs.locale('ja')</script>
+    <script>
+      // Global auth state
+      window.currentUser = null;
+      window.accessibleMeetingTypes = [];
+      
+      // Auth helper functions
+      async function loadCurrentUser() {
+        try {
+          const res = await axios.get('/api/auth/me');
+          window.currentUser = res.data.user;
+          window.accessibleMeetingTypes = res.data.accessible_meeting_types || [];
+          window.userTeams = res.data.teams || [];
+          updateUserMenu();
+          updateNavVisibility();
+          return res.data;
+        } catch(e) {
+          console.error('Auth check failed:', e);
+          window.currentUser = null;
+          updateUserMenu();
+          return null;
+        }
+      }
+      
+      function updateUserMenu() {
+        const menu = document.getElementById('user-menu');
+        if (!menu) return;
+        
+        if (window.currentUser) {
+          const roleLabels = { participant: '参加者', manager: 'マネージャー', executive: '経営層' };
+          const roleColors = { participant: 'bg-gray-100 text-gray-700', manager: 'bg-blue-100 text-blue-700', executive: 'bg-purple-100 text-purple-700' };
+          menu.innerHTML = \`
+            <span class="text-sm text-gray-500">\${window.currentUser.name}</span>
+            <span class="px-2 py-1 rounded-full text-xs font-medium \${roleColors[window.currentUser.role]}">
+              \${roleLabels[window.currentUser.role]}
+            </span>
+            <button onclick="logout()" class="text-gray-500 hover:text-red-600" title="ログアウト">
+              <i class="fas fa-sign-out-alt"></i>
+            </button>
+          \`;
+        } else {
+          menu.innerHTML = \`
+            <button onclick="openLoginModal()" class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">
+              <i class="fas fa-sign-in-alt mr-1"></i>ログイン
+            </button>
+          \`;
+        }
+      }
+      
+      function updateNavVisibility() {
+        // Hide/show nav links based on permissions
+        const links = document.getElementById('nav-links');
+        if (!links) return;
+        
+        // If not logged in, show only basic navigation
+        if (!window.currentUser) {
+          links.querySelectorAll('a').forEach(a => {
+            if (a.getAttribute('href') !== '/') {
+              a.style.display = 'none';
+            }
+          });
+        } else {
+          links.querySelectorAll('a').forEach(a => a.style.display = '');
+        }
+      }
+      
+      function canViewMeetingType(typeSlug) {
+        if (!window.currentUser) return false;
+        const perm = window.accessibleMeetingTypes.find(mt => mt.slug === typeSlug);
+        return perm && perm.can_view;
+      }
+      
+      function canManageMeetingType(typeSlug) {
+        if (!window.currentUser) return false;
+        const perm = window.accessibleMeetingTypes.find(mt => mt.slug === typeSlug);
+        return perm && perm.can_manage;
+      }
+      
+      function canCreateMeetingType(typeSlug) {
+        if (!window.currentUser) return false;
+        const perm = window.accessibleMeetingTypes.find(mt => mt.slug === typeSlug);
+        return perm && perm.can_create;
+      }
+      
+      async function logout() {
+        try {
+          await axios.post('/api/auth/logout');
+          window.currentUser = null;
+          window.accessibleMeetingTypes = [];
+          updateUserMenu();
+          updateNavVisibility();
+          window.location.href = '/';
+        } catch(e) {
+          console.error('Logout failed:', e);
+        }
+      }
+      
+      function openLoginModal() {
+        const modal = document.getElementById('login-modal');
+        if (modal) modal.classList.add('active');
+      }
+      
+      function closeLoginModal() {
+        const modal = document.getElementById('login-modal');
+        if (modal) modal.classList.remove('active');
+      }
+      
+      // Initialize auth on page load
+      document.addEventListener('DOMContentLoaded', loadCurrentUser);
+    </script>
     <style>
       .meeting-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
       .status-badge { padding: 2px 8px; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; }
@@ -72,11 +181,14 @@ const renderPage = (title: string, content: string, scripts: string = '') => `
                 <span class="font-bold text-xl text-gray-800">VEXUM</span>
                 <span class="text-gray-400 text-sm">Meeting OS</span>
             </a>
-            <div class="flex items-center space-x-4">
+            <div class="flex items-center space-x-4" id="nav-links">
                 <a href="/" class="text-gray-600 hover:text-blue-600"><i class="fas fa-home mr-1"></i>会議一覧</a>
                 <a href="/issues" class="text-gray-600 hover:text-blue-600"><i class="fas fa-inbox mr-1"></i>保留箱</a>
                 <a href="/dashboard" class="text-gray-600 hover:text-blue-600"><i class="fas fa-chart-line mr-1"></i>ダッシュボード</a>
                 <a href="/triage" class="text-gray-600 hover:text-blue-600"><i class="fas fa-tasks mr-1"></i>一括整備</a>
+            </div>
+            <div id="user-menu" class="flex items-center space-x-3">
+                <!-- Dynamic user menu loaded by JS -->
             </div>
         </div>
     </nav>
@@ -96,7 +208,7 @@ app.get('/', (c) => {
         <h1 class="text-2xl font-bold text-gray-800 mb-2">今週の会議</h1>
         <p class="text-gray-600">参加予定の会議を確認し、会議室にアクセスしましょう</p>
       </div>
-      <button onclick="openCreateMeetingModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center">
+      <button id="create-meeting-btn" onclick="openCreateMeetingModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center hidden">
         <i class="fas fa-plus mr-2"></i>会議を作成
       </button>
     </div>
@@ -113,6 +225,32 @@ app.get('/', (c) => {
     <!-- Meeting List -->
     <div id="meeting-list" class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       <div class="text-center py-8 text-gray-500">読み込み中...</div>
+    </div>
+    
+    <!-- Login Modal -->
+    <div id="login-modal" class="modal">
+      <div class="modal-content p-6" style="max-width: 24rem;">
+        <h3 class="text-lg font-bold mb-4"><i class="fas fa-sign-in-alt mr-2 text-blue-600"></i>ログイン</h3>
+        <p class="text-sm text-gray-600 mb-4">会議システムにログインしてください。</p>
+        <form id="login-form">
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">ユーザーを選択</label>
+            <select id="login-user-select" class="w-full border rounded-lg px-3 py-2" required>
+              <option value="">選択してください...</option>
+            </select>
+          </div>
+          <div id="login-user-info" class="mb-4 p-3 bg-gray-50 rounded-lg hidden">
+            <div class="text-sm text-gray-600" id="login-user-details"></div>
+          </div>
+          <div id="login-error" class="mb-4 text-red-600 text-sm hidden"></div>
+          <div class="flex justify-end space-x-2">
+            <button type="button" onclick="closeLoginModal()" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">キャンセル</button>
+            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+              <i class="fas fa-sign-in-alt mr-2"></i>ログイン
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
     
     <!-- Create Meeting Modal -->
@@ -245,7 +383,45 @@ app.get('/', (c) => {
         renderMeetings();
       }
       
+      // Update filter buttons based on permissions
+      function updateFilterButtons() {
+        const buttons = document.querySelectorAll('.filter-btn');
+        buttons.forEach(btn => {
+          const filter = btn.dataset.filter;
+          if (filter === '') {
+            // "すべて" button always visible if logged in
+            btn.style.display = window.currentUser ? '' : 'none';
+          } else {
+            // Check if user can view this meeting type
+            const canView = canViewMeetingType(filter);
+            btn.style.display = canView ? '' : 'none';
+          }
+        });
+        
+        // Show/hide create meeting button
+        const createBtn = document.getElementById('create-meeting-btn');
+        if (createBtn) {
+          const canCreateAny = window.accessibleMeetingTypes && window.accessibleMeetingTypes.some(mt => mt.can_create);
+          createBtn.classList.toggle('hidden', !canCreateAny);
+        }
+      }
+      
       function renderMeetings() {
+        // Show login prompt if not logged in
+        if (!window.currentUser) {
+          document.getElementById('meeting-list').innerHTML = \`
+            <div class="col-span-full text-center py-12 bg-white rounded-lg border">
+              <i class="fas fa-lock text-4xl text-gray-300 mb-4"></i>
+              <h3 class="text-lg font-semibold text-gray-700 mb-2">ログインが必要です</h3>
+              <p class="text-gray-500 mb-4">会議一覧を表示するにはログインしてください</p>
+              <button onclick="openLoginModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                <i class="fas fa-sign-in-alt mr-2"></i>ログイン
+              </button>
+            </div>
+          \`;
+          return;
+        }
+        
         const filtered = currentFilter 
           ? allMeetings.filter(m => m.meeting_type_slug === currentFilter)
           : allMeetings;
@@ -405,9 +581,126 @@ app.get('/', (c) => {
         }
       });
       
-      // Initialize
-      loadMeetings();
-      loadTeams();
+      // Login functionality
+      async function loadLoginUsers() {
+        try {
+          const res = await axios.get('/api/users');
+          const select = document.getElementById('login-user-select');
+          const roleLabels = { participant: '参加者', manager: 'マネージャー', executive: '経営層' };
+          const roleIcons = { participant: '👤', manager: '👔', executive: '👑' };
+          
+          select.innerHTML = '<option value="">選択してください...</option>';
+          res.data.forEach(u => {
+            select.innerHTML += \`<option value="\${u.email}" data-role="\${u.role}">\${roleIcons[u.role]} \${u.name} (\${roleLabels[u.role]})</option>\`;
+          });
+        } catch (err) {
+          console.error('Failed to load users:', err);
+        }
+      }
+      
+      document.getElementById('login-user-select').addEventListener('change', function() {
+        const infoDiv = document.getElementById('login-user-info');
+        const detailsDiv = document.getElementById('login-user-details');
+        
+        if (this.value) {
+          const option = this.options[this.selectedIndex];
+          const role = option.dataset.role;
+          const roleLabels = { participant: '参加者', manager: 'マネージャー', executive: '経営層' };
+          const accessInfo = {
+            participant: 'チームMTG、全体会議を閲覧できます',
+            manager: 'チームMTG、本部会議、全体会議を管理できます',
+            executive: 'すべての会議を管理できます（戦略会議含む）'
+          };
+          
+          detailsDiv.innerHTML = \`
+            <div class="font-medium text-gray-800 mb-1">権限: \${roleLabels[role]}</div>
+            <div class="text-xs text-gray-500">\${accessInfo[role]}</div>
+          \`;
+          infoDiv.classList.remove('hidden');
+        } else {
+          infoDiv.classList.add('hidden');
+        }
+      });
+      
+      document.getElementById('login-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('login-user-select').value;
+        const errorDiv = document.getElementById('login-error');
+        
+        if (!email) {
+          errorDiv.textContent = 'ユーザーを選択してください';
+          errorDiv.classList.remove('hidden');
+          return;
+        }
+        
+        try {
+          const res = await axios.post('/api/auth/login', { email });
+          window.currentUser = res.data.user;
+          closeLoginModal();
+          
+          // Reload page data with new auth
+          await loadCurrentUser();
+          loadMeetings();
+          updateMeetingTypeOptions();
+        } catch (err) {
+          errorDiv.textContent = err.response?.data?.error || 'ログインに失敗しました';
+          errorDiv.classList.remove('hidden');
+        }
+      });
+      
+      // Update meeting type options based on permissions
+      function updateMeetingTypeOptions() {
+        const typeSelector = document.getElementById('meeting-type-selector');
+        if (!typeSelector) return;
+        
+        const typeSlugs = ['team', 'headquarters', 'strategy', 'all-hands'];
+        typeSelector.querySelectorAll('.meeting-type-option').forEach((option, idx) => {
+          const slug = typeSlugs[idx];
+          const canCreate = canCreateMeetingType(slug);
+          
+          if (!canCreate) {
+            option.style.opacity = '0.5';
+            option.style.pointerEvents = 'none';
+            option.querySelector('input').disabled = true;
+            option.querySelector('div').classList.add('bg-gray-100');
+          } else {
+            option.style.opacity = '1';
+            option.style.pointerEvents = 'auto';
+            option.querySelector('input').disabled = false;
+            option.querySelector('div').classList.remove('bg-gray-100');
+          }
+        });
+      }
+      
+      // Override openCreateMeetingModal to check auth
+      const originalOpenCreateMeetingModal = openCreateMeetingModal;
+      openCreateMeetingModal = function() {
+        if (!window.currentUser) {
+          openLoginModal();
+          return;
+        }
+        
+        // Check if user can create any meeting type
+        const canCreateAny = window.accessibleMeetingTypes.some(mt => mt.can_create);
+        if (!canCreateAny) {
+          alert('会議を作成する権限がありません');
+          return;
+        }
+        
+        originalOpenCreateMeetingModal();
+        updateMeetingTypeOptions();
+      };
+      
+      // Initialize on page load
+      async function initPage() {
+        await loadCurrentUser();
+        updateFilterButtons();
+        loadMeetings();
+        loadTeams();
+        loadLoginUsers();
+      }
+      
+      initPage();
     </script>
   `;
   
@@ -534,9 +827,103 @@ app.get('/meeting/:id', async (c) => {
         </div>
       </div>
     </div>
+    
+    <!-- Login Modal (for meeting room) -->
+    <div id="login-modal" class="modal">
+      <div class="modal-content p-6" style="max-width: 24rem;">
+        <h3 class="text-lg font-bold mb-4"><i class="fas fa-sign-in-alt mr-2 text-blue-600"></i>ログイン</h3>
+        <p class="text-sm text-gray-600 mb-4">会議室にアクセスするにはログインしてください。</p>
+        <form id="login-form">
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">ユーザーを選択</label>
+            <select id="login-user-select" class="w-full border rounded-lg px-3 py-2" required>
+              <option value="">選択してください...</option>
+            </select>
+          </div>
+          <div id="login-user-info" class="mb-4 p-3 bg-gray-50 rounded-lg hidden">
+            <div class="text-sm text-gray-600" id="login-user-details"></div>
+          </div>
+          <div id="login-error" class="mb-4 text-red-600 text-sm hidden"></div>
+          <div class="flex justify-end space-x-2">
+            <a href="/" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">トップへ戻る</a>
+            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+              <i class="fas fa-sign-in-alt mr-2"></i>ログイン
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   `;
   
   const scripts = `
+    <script>
+      // Login functionality for meeting room
+      async function loadLoginUsers() {
+        try {
+          const res = await axios.get('/api/users');
+          const select = document.getElementById('login-user-select');
+          const roleLabels = { participant: '参加者', manager: 'マネージャー', executive: '経営層' };
+          const roleIcons = { participant: '👤', manager: '👔', executive: '👑' };
+          
+          select.innerHTML = '<option value="">選択してください...</option>';
+          res.data.forEach(u => {
+            select.innerHTML += \`<option value="\${u.email}" data-role="\${u.role}">\${roleIcons[u.role]} \${u.name} (\${roleLabels[u.role]})</option>\`;
+          });
+        } catch (err) {
+          console.error('Failed to load users:', err);
+        }
+      }
+      
+      document.getElementById('login-user-select').addEventListener('change', function() {
+        const infoDiv = document.getElementById('login-user-info');
+        const detailsDiv = document.getElementById('login-user-details');
+        
+        if (this.value) {
+          const option = this.options[this.selectedIndex];
+          const role = option.dataset.role;
+          const roleLabels = { participant: '参加者', manager: 'マネージャー', executive: '経営層' };
+          const accessInfo = {
+            participant: 'チームMTG、全体会議を閲覧できます',
+            manager: 'チームMTG、本部会議、全体会議を管理できます',
+            executive: 'すべての会議を管理できます（戦略会議含む）'
+          };
+          
+          detailsDiv.innerHTML = \`
+            <div class="font-medium text-gray-800 mb-1">権限: \${roleLabels[role]}</div>
+            <div class="text-xs text-gray-500">\${accessInfo[role]}</div>
+          \`;
+          infoDiv.classList.remove('hidden');
+        } else {
+          infoDiv.classList.add('hidden');
+        }
+      });
+      
+      document.getElementById('login-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('login-user-select').value;
+        const errorDiv = document.getElementById('login-error');
+        
+        if (!email) {
+          errorDiv.textContent = 'ユーザーを選択してください';
+          errorDiv.classList.remove('hidden');
+          return;
+        }
+        
+        try {
+          const res = await axios.post('/api/auth/login', { email });
+          window.currentUser = res.data.user;
+          closeLoginModal();
+          
+          // Reload page to show meeting room
+          window.location.reload();
+        } catch (err) {
+          errorDiv.textContent = err.response?.data?.error || 'ログインに失敗しました';
+          errorDiv.classList.remove('hidden');
+        }
+      });
+      
+      loadLoginUsers();
+    </script>
     <script src="/static/meeting-room.js"></script>
   `;
   
