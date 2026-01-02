@@ -8,7 +8,7 @@
     {
       "binding": "DB",
       "database_name": "vexum-meeting-os-db",
-      "database_id": "local-dev-db"
+      "database_id": "35c9f7cc-84bb-4753-8c30-a328d0957b20"
     }
   ]
 }
