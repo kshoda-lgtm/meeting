@@ -170,36 +170,132 @@ const renderPage = (title: string, content: string, scripts: string = '') => `
       .client-focus { border-left: 3px solid #10B981; }
       .client-all { border-left: 3px solid #6B7280; }
       .client-dormant { border-left: 3px solid #D1D5DB; opacity: 0.7; }
-      .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 50; }
+      .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 50; padding: 1rem; }
       .modal.active { display: flex; justify-content: center; align-items: center; }
-      .modal-content { background: white; border-radius: 0.5rem; max-width: 32rem; width: 100%; max-height: 90vh; overflow-y: auto; }
+      .modal-content { background: white; border-radius: 0.5rem; max-width: 32rem; width: 100%; max-height: 90vh; overflow-y: auto; margin: auto; }
       .tooltip { position: relative; }
       .tooltip:hover::after { content: attr(data-tip); position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); padding: 4px 8px; background: #374151; color: white; font-size: 0.75rem; border-radius: 4px; white-space: nowrap; z-index: 10; }
+      
+      /* Mobile responsive styles */
+      @media (max-width: 768px) {
+        .nav-links-desktop { display: none !important; }
+        .mobile-menu-btn { display: flex !important; }
+        .mobile-menu { display: none; position: fixed; top: 60px; left: 0; right: 0; background: white; border-bottom: 1px solid #e5e7eb; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); z-index: 40; }
+        .mobile-menu.active { display: block; }
+        .mobile-menu a { display: block; padding: 12px 16px; border-bottom: 1px solid #f3f4f6; }
+        .mobile-menu a:hover { background: #f9fafb; }
+        .modal-content { max-width: 100%; margin: 0.5rem; border-radius: 0.5rem; }
+        .modal { padding: 0.5rem; }
+        .meeting-type-grid { grid-template-columns: 1fr !important; }
+        .filter-buttons { flex-wrap: wrap; gap: 0.5rem; }
+        .filter-buttons button { font-size: 0.75rem; padding: 0.375rem 0.75rem; }
+        /* Meeting room mobile grid */
+        .meeting-room-grid { grid-template-columns: 1fr !important; }
+        .meeting-room-grid > div:first-child { order: 1; }
+        .meeting-room-grid > div:last-child { order: 0; }
+        /* Touch-friendly buttons */
+        button, select, input { min-height: 44px; }
+        input[type="range"] { min-height: auto; }
+        .status-badge { padding: 4px 10px; }
+        /* Card sections */
+        .section-card { margin-bottom: 1rem; }
+        .section-card .p-4 { padding: 0.75rem; }
+        .section-card .p-3 { padding: 0.75rem; }
+        /* Dashboard grid */
+        .dashboard-stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
+        .dashboard-stats-grid > div:last-child { grid-column: span 2; }
+        .dashboard-content-grid { grid-template-columns: 1fr !important; }
+        /* Issues filter grid */
+        .issues-filter-grid { grid-template-columns: 1fr !important; gap: 0.75rem; }
+        /* Triage list item */
+        .triage-item-content { flex-direction: column; gap: 0.75rem; }
+        .triage-item-content > div:last-child { flex-direction: column; width: 100%; gap: 0.5rem; }
+        .triage-item-content select, .triage-item-content input { width: 100%; }
+        /* Admin responsive table */
+        .admin-table { display: none; }
+        .admin-cards { display: block !important; }
+        /* Quick capture mobile */
+        .quick-capture-mobile { flex-direction: column; gap: 0.5rem; }
+        .quick-capture-mobile input { width: 100%; }
+        .quick-capture-mobile button { width: 100%; }
+      }
+      @media (min-width: 769px) {
+        .mobile-menu-btn { display: none !important; }
+        .mobile-menu { display: none !important; }
+        .admin-cards { display: none !important; }
+      }
+      /* Tablet adjustments */
+      @media (max-width: 1024px) and (min-width: 769px) {
+        .meeting-room-grid { grid-template-columns: 1fr 1fr !important; }
+      }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
-    <nav class="bg-white shadow-sm border-b">
+    <nav class="bg-white shadow-sm border-b sticky top-0 z-30">
         <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-            <a href="/" class="flex items-center space-x-2">
-                <div class="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
-                    <i class="fas fa-video text-white text-sm"></i>
-                </div>
-                <span class="font-bold text-xl text-gray-800">VEXUM</span>
-                <span class="text-gray-400 text-sm">Meeting OS</span>
-            </a>
-            <div class="flex items-center space-x-4" id="nav-links">
+            <div class="flex items-center">
+                <!-- Mobile menu button -->
+                <button onclick="toggleMobileMenu()" class="mobile-menu-btn mr-3 p-2 text-gray-600 hover:text-blue-600 hover:bg-gray-100 rounded-lg" style="display:none;">
+                    <i class="fas fa-bars text-xl"></i>
+                </button>
+                <a href="/" class="flex items-center space-x-2">
+                    <div class="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-video text-white text-sm"></i>
+                    </div>
+                    <span class="font-bold text-xl text-gray-800">VEXUM</span>
+                    <span class="text-gray-400 text-sm hidden sm:inline">Meeting OS</span>
+                </a>
+            </div>
+            <!-- Desktop nav -->
+            <div class="nav-links-desktop flex items-center space-x-4" id="nav-links">
                 <a href="/" class="text-gray-600 hover:text-blue-600"><i class="fas fa-home mr-1"></i>会議一覧</a>
                 <a href="/issues" class="text-gray-600 hover:text-blue-600"><i class="fas fa-inbox mr-1"></i>保留箱</a>
                 <a href="/dashboard" class="text-gray-600 hover:text-blue-600"><i class="fas fa-chart-line mr-1"></i>ダッシュボード</a>
                 <a href="/triage" class="text-gray-600 hover:text-blue-600"><i class="fas fa-tasks mr-1"></i>一括整備</a>
                 <a href="/admin" class="text-gray-600 hover:text-blue-600 admin-link" style="display:none;"><i class="fas fa-cog mr-1"></i>管理</a>
             </div>
-            <div id="user-menu" class="flex items-center space-x-3">
+            <div id="user-menu" class="flex items-center space-x-2 sm:space-x-3">
                 <!-- Dynamic user menu loaded by JS -->
             </div>
         </div>
     </nav>
-    <main class="max-w-7xl mx-auto px-4 py-6">
+    <!-- Mobile menu -->
+    <div id="mobile-menu" class="mobile-menu">
+        <a href="/" class="text-gray-600"><i class="fas fa-home mr-2"></i>会議一覧</a>
+        <a href="/issues" class="text-gray-600"><i class="fas fa-inbox mr-2"></i>保留箱</a>
+        <a href="/dashboard" class="text-gray-600"><i class="fas fa-chart-line mr-2"></i>ダッシュボード</a>
+        <a href="/triage" class="text-gray-600"><i class="fas fa-tasks mr-2"></i>一括整備</a>
+        <a href="/admin" class="text-gray-600 mobile-admin-link" style="display:none;"><i class="fas fa-cog mr-2"></i>管理</a>
+    </div>
+    <script>
+        function toggleMobileMenu() {
+            const menu = document.getElementById('mobile-menu');
+            menu.classList.toggle('active');
+        }
+        // Close mobile menu when clicking outside
+        document.addEventListener('click', function(e) {
+            const menu = document.getElementById('mobile-menu');
+            const btn = document.querySelector('.mobile-menu-btn');
+            if (menu && !menu.contains(e.target) && !btn.contains(e.target)) {
+                menu.classList.remove('active');
+            }
+        });
+        // Update mobile menu visibility
+        function updateMobileNavVisibility() {
+            const adminLink = document.querySelector('.mobile-admin-link');
+            if (adminLink && window.currentUser) {
+                const canAdmin = window.currentUser.role === 'manager' || window.currentUser.role === 'executive';
+                adminLink.style.display = canAdmin ? 'block' : 'none';
+            }
+        }
+        // Hook into existing updateNavVisibility
+        const originalUpdateNavVisibility = updateNavVisibility;
+        updateNavVisibility = function() {
+            originalUpdateNavVisibility();
+            updateMobileNavVisibility();
+        };
+    </script>
+    <main class="max-w-7xl mx-auto px-4 py-4 sm:py-6">
         ${content}
     </main>
     ${scripts}
@@ -210,29 +306,29 @@ const renderPage = (title: string, content: string, scripts: string = '') => `
 // Home page - Meeting list
 app.get('/', (c) => {
   const content = `
-    <div class="mb-6 flex items-center justify-between">
+    <div class="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
       <div>
-        <h1 class="text-2xl font-bold text-gray-800 mb-2">今週の会議</h1>
-        <p class="text-gray-600">参加予定の会議を確認し、会議室にアクセスしましょう</p>
+        <h1 class="text-xl sm:text-2xl font-bold text-gray-800 mb-1 sm:mb-2">今週の会議</h1>
+        <p class="text-sm sm:text-base text-gray-600">参加予定の会議を確認しましょう</p>
       </div>
-      <button id="create-meeting-btn" onclick="openCreateMeetingModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center hidden">
+      <button id="create-meeting-btn" onclick="openCreateMeetingModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center hidden w-full sm:w-auto">
         <i class="fas fa-plus mr-2"></i>会議を作成
       </button>
     </div>
     
     <!-- Meeting Type Filters -->
-    <div class="flex flex-wrap gap-2 mb-6">
-      <button onclick="filterMeetings('')" class="filter-btn px-4 py-2 rounded-lg bg-blue-600 text-white" data-filter="">すべて</button>
-      <button onclick="filterMeetings('team')" class="filter-btn px-4 py-2 rounded-lg bg-white text-gray-700 border" data-filter="team">チームMTG</button>
-      <button onclick="filterMeetings('headquarters')" class="filter-btn px-4 py-2 rounded-lg bg-white text-gray-700 border" data-filter="headquarters">本部会議</button>
-      <button onclick="filterMeetings('strategy')" class="filter-btn px-4 py-2 rounded-lg bg-white text-gray-700 border" data-filter="strategy">戦略会議</button>
-      <button onclick="filterMeetings('all-hands')" class="filter-btn px-4 py-2 rounded-lg bg-white text-gray-700 border" data-filter="all-hands">全体会議</button>
-      <button onclick="filterMeetings('one-on-one')" class="filter-btn px-4 py-2 rounded-lg bg-white text-gray-700 border" data-filter="one-on-one">1on1</button>
-      <button onclick="filterMeetings('other')" class="filter-btn px-4 py-2 rounded-lg bg-white text-gray-700 border" data-filter="other">その他</button>
+    <div class="flex flex-wrap gap-2 mb-4 sm:mb-6 filter-buttons overflow-x-auto pb-2">
+      <button onclick="filterMeetings('')" class="filter-btn px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg bg-blue-600 text-white text-sm whitespace-nowrap" data-filter="">すべて</button>
+      <button onclick="filterMeetings('team')" class="filter-btn px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg bg-white text-gray-700 border text-sm whitespace-nowrap" data-filter="team">チームMTG</button>
+      <button onclick="filterMeetings('headquarters')" class="filter-btn px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg bg-white text-gray-700 border text-sm whitespace-nowrap" data-filter="headquarters">本部会議</button>
+      <button onclick="filterMeetings('strategy')" class="filter-btn px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg bg-white text-gray-700 border text-sm whitespace-nowrap" data-filter="strategy">戦略会議</button>
+      <button onclick="filterMeetings('all-hands')" class="filter-btn px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg bg-white text-gray-700 border text-sm whitespace-nowrap" data-filter="all-hands">全体会議</button>
+      <button onclick="filterMeetings('one-on-one')" class="filter-btn px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg bg-white text-gray-700 border text-sm whitespace-nowrap" data-filter="one-on-one">1on1</button>
+      <button onclick="filterMeetings('other')" class="filter-btn px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg bg-white text-gray-700 border text-sm whitespace-nowrap" data-filter="other">その他</button>
     </div>
     
     <!-- Meeting List -->
-    <div id="meeting-list" class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+    <div id="meeting-list" class="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
       <div class="text-center py-8 text-gray-500">読み込み中...</div>
     </div>
     
@@ -263,72 +359,72 @@ app.get('/', (c) => {
     
     <!-- Create Meeting Modal -->
     <div id="create-meeting-modal" class="modal">
-      <div class="modal-content p-6" style="max-width: 40rem;">
+      <div class="modal-content p-4 sm:p-6" style="max-width: 40rem;">
         <h3 class="text-lg font-bold mb-4"><i class="fas fa-calendar-plus mr-2 text-blue-600"></i>新しい会議を作成</h3>
         <form id="create-meeting-form">
           
           <!-- Meeting Type Selection -->
-          <div class="mb-6">
+          <div class="mb-4 sm:mb-6">
             <label class="block text-sm font-medium text-gray-700 mb-3">会議の種類</label>
-            <div class="grid grid-cols-2 gap-3" id="meeting-type-selector">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 meeting-type-grid" id="meeting-type-selector">
               <label class="meeting-type-option cursor-pointer">
                 <input type="radio" name="meeting_type" value="1" class="hidden" onchange="onMeetingTypeChange(this)">
-                <div class="border-2 rounded-lg p-4 hover:border-green-400 transition-colors border-l-4 border-l-green-500">
-                  <div class="flex items-center mb-2">
+                <div class="border-2 rounded-lg p-3 sm:p-4 hover:border-green-400 transition-colors border-l-4 border-l-green-500">
+                  <div class="flex items-center mb-1 sm:mb-2">
                     <i class="fas fa-users text-green-500 mr-2"></i>
-                    <span class="font-semibold text-gray-800">チームMTG</span>
+                    <span class="font-semibold text-gray-800 text-sm sm:text-base">チームMTG</span>
                   </div>
-                  <p class="text-xs text-gray-500">週1回、常駐先単位で施策進捗・品質・来週コミット・提案のタネを整理</p>
+                  <p class="text-xs text-gray-500 hidden sm:block">週1回、常駐先単位で施策進捗・品質・来週コミット・提案のタネを整理</p>
                 </div>
               </label>
               <label class="meeting-type-option cursor-pointer">
                 <input type="radio" name="meeting_type" value="2" class="hidden" onchange="onMeetingTypeChange(this)">
-                <div class="border-2 rounded-lg p-4 hover:border-blue-400 transition-colors border-l-4 border-l-blue-500">
-                  <div class="flex items-center mb-2">
+                <div class="border-2 rounded-lg p-3 sm:p-4 hover:border-blue-400 transition-colors border-l-4 border-l-blue-500">
+                  <div class="flex items-center mb-1 sm:mb-2">
                     <i class="fas fa-building text-blue-500 mr-2"></i>
-                    <span class="font-semibold text-gray-800">本部会議</span>
+                    <span class="font-semibold text-gray-800 text-sm sm:text-base">本部会議</span>
                   </div>
-                  <p class="text-xs text-gray-500">リーダー/副リーダー。会社決定の共有・運用統制・横断詰まり解消</p>
+                  <p class="text-xs text-gray-500 hidden sm:block">リーダー/副リーダー。会社決定の共有・運用統制・横断詰まり解消</p>
                 </div>
               </label>
               <label class="meeting-type-option cursor-pointer">
                 <input type="radio" name="meeting_type" value="3" class="hidden" onchange="onMeetingTypeChange(this)">
-                <div class="border-2 rounded-lg p-4 hover:border-purple-400 transition-colors border-l-4 border-l-purple-500">
-                  <div class="flex items-center mb-2">
+                <div class="border-2 rounded-lg p-3 sm:p-4 hover:border-purple-400 transition-colors border-l-4 border-l-purple-500">
+                  <div class="flex items-center mb-1 sm:mb-2">
                     <i class="fas fa-chess text-purple-500 mr-2"></i>
-                    <span class="font-semibold text-gray-800">戦略会議</span>
+                    <span class="font-semibold text-gray-800 text-sm sm:text-base">戦略会議</span>
                   </div>
-                  <p class="text-xs text-gray-500">V2。優先順位・配分・トレードオフ・重大判断に集中</p>
+                  <p class="text-xs text-gray-500 hidden sm:block">V2。優先順位・配分・トレードオフ・重大判断に集中</p>
                 </div>
               </label>
               <label class="meeting-type-option cursor-pointer">
                 <input type="radio" name="meeting_type" value="4" class="hidden" onchange="onMeetingTypeChange(this)">
-                <div class="border-2 rounded-lg p-4 hover:border-orange-400 transition-colors border-l-4 border-l-orange-500">
-                  <div class="flex items-center mb-2">
+                <div class="border-2 rounded-lg p-3 sm:p-4 hover:border-orange-400 transition-colors border-l-4 border-l-orange-500">
+                  <div class="flex items-center mb-1 sm:mb-2">
                     <i class="fas fa-globe text-orange-500 mr-2"></i>
-                    <span class="font-semibold text-gray-800">全体会議</span>
+                    <span class="font-semibold text-gray-800 text-sm sm:text-base">全体会議</span>
                   </div>
-                  <p class="text-xs text-gray-500">月1回、本部決定の要点共有、月次振り返り、横展開</p>
+                  <p class="text-xs text-gray-500 hidden sm:block">月1回、本部決定の要点共有、月次振り返り、横展開</p>
                 </div>
               </label>
               <label class="meeting-type-option cursor-pointer">
                 <input type="radio" name="meeting_type" value="5" class="hidden" onchange="onMeetingTypeChange(this)">
-                <div class="border-2 rounded-lg p-4 hover:border-pink-400 transition-colors border-l-4 border-l-pink-500">
-                  <div class="flex items-center mb-2">
+                <div class="border-2 rounded-lg p-3 sm:p-4 hover:border-pink-400 transition-colors border-l-4 border-l-pink-500">
+                  <div class="flex items-center mb-1 sm:mb-2">
                     <i class="fas fa-user-friends text-pink-500 mr-2"></i>
-                    <span class="font-semibold text-gray-800">1on1</span>
+                    <span class="font-semibold text-gray-800 text-sm sm:text-base">1on1</span>
                   </div>
-                  <p class="text-xs text-gray-500">上司と部下の1対1ミーティング。成長支援・課題相談・フィードバック</p>
+                  <p class="text-xs text-gray-500 hidden sm:block">上司と部下の1対1ミーティング。成長支援・課題相談・フィードバック</p>
                 </div>
               </label>
               <label class="meeting-type-option cursor-pointer">
                 <input type="radio" name="meeting_type" value="6" class="hidden" onchange="onMeetingTypeChange(this)">
-                <div class="border-2 rounded-lg p-4 hover:border-gray-400 transition-colors border-l-4 border-l-gray-500">
-                  <div class="flex items-center mb-2">
+                <div class="border-2 rounded-lg p-3 sm:p-4 hover:border-gray-400 transition-colors border-l-4 border-l-gray-500">
+                  <div class="flex items-center mb-1 sm:mb-2">
                     <i class="fas fa-ellipsis-h text-gray-500 mr-2"></i>
-                    <span class="font-semibold text-gray-800">その他</span>
+                    <span class="font-semibold text-gray-800 text-sm sm:text-base">その他</span>
                   </div>
-                  <p class="text-xs text-gray-500">上記に当てはまらない会議。臨時会議・プロジェクト会議など</p>
+                  <p class="text-xs text-gray-500 hidden sm:block">上記に当てはまらない会議。臨時会議・プロジェクト会議など</p>
                 </div>
               </label>
             </div>
@@ -337,7 +433,7 @@ app.get('/', (c) => {
           <!-- Team Selection (for Team MTG only) -->
           <div class="mb-4" id="team-select-container" style="display: none;">
             <label class="block text-sm font-medium text-gray-700 mb-2">対象チーム</label>
-            <select id="meeting-team" class="w-full border rounded-lg px-3 py-2">
+            <select id="meeting-team" class="w-full border rounded-lg px-3 py-2 text-base">
               <option value="">チームを選択してください</option>
             </select>
           </div>
@@ -345,19 +441,19 @@ app.get('/', (c) => {
           <!-- Meeting Title -->
           <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-2">会議タイトル</label>
-            <input type="text" id="meeting-title" class="w-full border rounded-lg px-3 py-2" placeholder="例: Alpha チームMTG 第1週" required>
+            <input type="text" id="meeting-title" class="w-full border rounded-lg px-3 py-2 text-base" placeholder="例: Alpha チームMTG 第1週" required>
           </div>
           
           <!-- Meeting Date/Time -->
           <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-2">開催日時</label>
-            <input type="datetime-local" id="meeting-datetime" class="w-full border rounded-lg px-3 py-2" required>
+            <input type="datetime-local" id="meeting-datetime" class="w-full border rounded-lg px-3 py-2 text-base" required>
           </div>
           
           <!-- Buttons -->
-          <div class="flex justify-end space-x-2 mt-6">
-            <button type="button" onclick="closeCreateMeetingModal()" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">キャンセル</button>
-            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+          <div class="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:space-x-2 mt-6">
+            <button type="button" onclick="closeCreateMeetingModal()" class="w-full sm:w-auto px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">キャンセル</button>
+            <button type="submit" class="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
               <i class="fas fa-check mr-2"></i>作成
             </button>
           </div>
@@ -934,23 +1030,23 @@ app.get('/meeting/:id', async (c) => {
 // Issues page
 app.get('/issues', (c) => {
   const content = `
-    <div class="mb-6">
-      <h1 class="text-2xl font-bold text-gray-800 mb-2">保留箱（Issue一覧）</h1>
-      <p class="text-gray-600">未解決の保留事項を会議/チーム横断で確認</p>
+    <div class="mb-4 sm:mb-6">
+      <h1 class="text-xl sm:text-2xl font-bold text-gray-800 mb-1 sm:mb-2">保留箱（Issue一覧）</h1>
+      <p class="text-sm sm:text-base text-gray-600">未解決の保留事項を会議/チーム横断で確認</p>
     </div>
     
     <!-- Filters -->
-    <div class="bg-white rounded-lg shadow-sm p-4 mb-6">
-      <div class="grid grid-cols-4 gap-4">
+    <div class="bg-white rounded-lg shadow-sm p-3 sm:p-4 mb-4 sm:mb-6">
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 issues-filter-grid">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">チーム</label>
-          <select id="filter-team" class="w-full border rounded-lg px-3 py-2" onchange="loadIssues()">
+          <select id="filter-team" class="w-full border rounded-lg px-3 py-2 text-base" onchange="loadIssues()">
             <option value="">すべて</option>
           </select>
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">状態</label>
-          <select id="filter-state" class="w-full border rounded-lg px-3 py-2" onchange="loadIssues()">
+          <select id="filter-state" class="w-full border rounded-lg px-3 py-2 text-base" onchange="loadIssues()">
             <option value="">すべて</option>
             <option value="pending_decision">判断待ち</option>
             <option value="waiting">待ち</option>
@@ -962,7 +1058,7 @@ app.get('/issues', (c) => {
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">解決状況</label>
-          <select id="filter-resolved" class="w-full border rounded-lg px-3 py-2" onchange="loadIssues()">
+          <select id="filter-resolved" class="w-full border rounded-lg px-3 py-2 text-base" onchange="loadIssues()">
             <option value="false">未解決のみ</option>
             <option value="true">解決済みのみ</option>
             <option value="">すべて</option>
@@ -970,7 +1066,7 @@ app.get('/issues', (c) => {
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">並び順</label>
-          <select id="filter-sort" class="w-full border rounded-lg px-3 py-2" onchange="loadIssues()">
+          <select id="filter-sort" class="w-full border rounded-lg px-3 py-2 text-base" onchange="loadIssues()">
             <option value="postponed">次回送り回数</option>
             <option value="created">作成日</option>
           </select>
@@ -1085,44 +1181,44 @@ app.get('/issues', (c) => {
 // Dashboard page
 app.get('/dashboard', (c) => {
   const content = `
-    <div class="mb-6">
-      <h1 class="text-2xl font-bold text-gray-800 mb-2">ダッシュボード</h1>
-      <p class="text-gray-600">会議・Action・保留箱の状況を俯瞰</p>
+    <div class="mb-4 sm:mb-6">
+      <h1 class="text-xl sm:text-2xl font-bold text-gray-800 mb-1 sm:mb-2">ダッシュボード</h1>
+      <p class="text-sm sm:text-base text-gray-600">会議・Action・保留箱の状況を俯瞰</p>
     </div>
     
     <!-- Stats Cards -->
-    <div class="grid grid-cols-5 gap-4 mb-6">
-      <div class="bg-white rounded-lg shadow-sm p-4">
-        <div class="text-sm text-gray-500 mb-1">Action完了率</div>
-        <div class="text-2xl font-bold text-blue-600" id="stat-completion">--%</div>
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-4 sm:mb-6 dashboard-stats-grid">
+      <div class="bg-white rounded-lg shadow-sm p-3 sm:p-4">
+        <div class="text-xs sm:text-sm text-gray-500 mb-1">Action完了率</div>
+        <div class="text-xl sm:text-2xl font-bold text-blue-600" id="stat-completion">--%</div>
       </div>
-      <div class="bg-white rounded-lg shadow-sm p-4">
-        <div class="text-sm text-gray-500 mb-1">期限超過</div>
-        <div class="text-2xl font-bold text-red-600" id="stat-overdue">--件</div>
+      <div class="bg-white rounded-lg shadow-sm p-3 sm:p-4">
+        <div class="text-xs sm:text-sm text-gray-500 mb-1">期限超過</div>
+        <div class="text-xl sm:text-2xl font-bold text-red-600" id="stat-overdue">--件</div>
       </div>
-      <div class="bg-white rounded-lg shadow-sm p-4">
-        <div class="text-sm text-gray-500 mb-1">未確定Action</div>
-        <div class="text-2xl font-bold text-yellow-600" id="stat-tentative">--件</div>
+      <div class="bg-white rounded-lg shadow-sm p-3 sm:p-4">
+        <div class="text-xs sm:text-sm text-gray-500 mb-1">未確定Action</div>
+        <div class="text-xl sm:text-2xl font-bold text-yellow-600" id="stat-tentative">--件</div>
       </div>
-      <div class="bg-white rounded-lg shadow-sm p-4">
-        <div class="text-sm text-gray-500 mb-1">滞留Issue</div>
-        <div class="text-2xl font-bold text-purple-600" id="stat-stagnant">--件</div>
+      <div class="bg-white rounded-lg shadow-sm p-3 sm:p-4">
+        <div class="text-xs sm:text-sm text-gray-500 mb-1">滞留Issue</div>
+        <div class="text-xl sm:text-2xl font-bold text-purple-600" id="stat-stagnant">--件</div>
       </div>
-      <div class="bg-white rounded-lg shadow-sm p-4">
-        <div class="text-sm text-gray-500 mb-1">平均確度</div>
-        <div class="text-2xl font-bold text-green-600" id="stat-confidence">--</div>
+      <div class="bg-white rounded-lg shadow-sm p-3 sm:p-4">
+        <div class="text-xs sm:text-sm text-gray-500 mb-1">平均確度</div>
+        <div class="text-xl sm:text-2xl font-bold text-green-600" id="stat-confidence">--</div>
       </div>
     </div>
     
     <!-- Team Filter -->
     <div class="mb-4">
-      <select id="team-filter" class="border rounded-lg px-3 py-2" onchange="loadDashboard()">
+      <select id="team-filter" class="border rounded-lg px-3 py-2 w-full sm:w-auto text-base" onchange="loadDashboard()">
         <option value="">全チーム</option>
       </select>
     </div>
     
     <!-- Quick Links -->
-    <div class="grid grid-cols-2 gap-6">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 dashboard-content-grid">
       <div class="bg-white rounded-lg shadow-sm p-4">
         <h3 class="font-bold text-gray-800 mb-3"><i class="fas fa-exclamation-circle text-red-500 mr-2"></i>要対応項目</h3>
         <div id="attention-items" class="space-y-2">
@@ -1200,18 +1296,18 @@ app.get('/triage', (c) => {
   const meetingId = c.req.query('meeting_id');
   
   const content = `
-    <div class="mb-6">
-      <h1 class="text-2xl font-bold text-gray-800 mb-2">一括整備（Triage）</h1>
-      <p class="text-gray-600">未確定のActionを一括で整備し、動ける状態にします</p>
+    <div class="mb-4 sm:mb-6">
+      <h1 class="text-xl sm:text-2xl font-bold text-gray-800 mb-1 sm:mb-2">一括整備（Triage）</h1>
+      <p class="text-sm sm:text-base text-gray-600">未確定のActionを一括で整備し、動ける状態にします</p>
     </div>
     
     <!-- Triage Form -->
     <form id="triage-form">
       <div class="bg-white rounded-lg shadow-sm">
-        <div class="p-4 border-b bg-gray-50">
-          <div class="flex items-center justify-between">
+        <div class="p-3 sm:p-4 border-b bg-gray-50">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <span class="font-medium text-gray-700">未確定Action一覧</span>
-            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+            <button type="submit" class="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
               <i class="fas fa-check mr-2"></i>一括確定
             </button>
           </div>
@@ -1252,20 +1348,20 @@ app.get('/triage', (c) => {
         const userOptions = users.map(u => \`<option value="\${u.id}">\${u.name}</option>\`).join('');
         
         const html = items.map(a => \`
-          <div class="p-4 hover:bg-gray-50" data-action-id="\${a.id}">
-            <div class="flex items-start gap-4">
+          <div class="p-3 sm:p-4 hover:bg-gray-50" data-action-id="\${a.id}">
+            <div class="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4 triage-item-content">
               <div class="flex-1">
-                <p class="text-gray-800 font-medium">\${a.content}</p>
-                <p class="text-sm text-gray-500 mt-1">\${a.meeting_title || ''}</p>
+                <p class="text-gray-800 font-medium text-sm sm:text-base">\${a.content}</p>
+                <p class="text-xs sm:text-sm text-gray-500 mt-1">\${a.meeting_title || ''}</p>
               </div>
-              <div class="flex items-center gap-3">
-                <select name="assignee_\${a.id}" class="border rounded px-2 py-1 text-sm">
+              <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
+                <select name="assignee_\${a.id}" class="border rounded px-3 py-2 text-sm sm:text-base">
                   <option value="">担当者を選択</option>
                   \${userOptions}
                 </select>
-                <input type="date" name="due_date_\${a.id}" value="\${a.due_date || ''}" class="border rounded px-2 py-1 text-sm">
-                <label class="flex items-center text-sm">
-                  <input type="checkbox" name="confirm_\${a.id}" class="mr-1" checked>
+                <input type="date" name="due_date_\${a.id}" value="\${a.due_date || ''}" class="border rounded px-3 py-2 text-sm sm:text-base">
+                <label class="flex items-center justify-center text-sm bg-gray-50 rounded px-3 py-2 sm:bg-transparent sm:px-0">
+                  <input type="checkbox" name="confirm_\${a.id}" class="mr-2 w-5 h-5" checked>
                   確定
                 </label>
               </div>
@@ -1316,9 +1412,9 @@ app.get('/triage', (c) => {
 // Admin page - Organization, Teams, Users management
 app.get('/admin', (c) => {
   const content = `
-    <div class="mb-6">
-      <h1 class="text-2xl font-bold text-gray-800 mb-2"><i class="fas fa-cog mr-2"></i>管理設定</h1>
-      <p class="text-gray-600">組織・チーム・ユーザーの管理</p>
+    <div class="mb-4 sm:mb-6">
+      <h1 class="text-xl sm:text-2xl font-bold text-gray-800 mb-1 sm:mb-2"><i class="fas fa-cog mr-2"></i>管理設定</h1>
+      <p class="text-sm sm:text-base text-gray-600">組織・チーム・ユーザーの管理</p>
     </div>
     
     <div id="admin-content">
@@ -1327,35 +1423,35 @@ app.get('/admin', (c) => {
     
     <!-- User Modal -->
     <div id="user-modal" class="modal">
-      <div class="modal-content p-6" style="max-width: 28rem;">
+      <div class="modal-content p-4 sm:p-6" style="max-width: 28rem;">
         <h3 class="text-lg font-bold mb-4" id="user-modal-title"><i class="fas fa-user mr-2 text-blue-600"></i>ユーザー追加</h3>
         <form id="user-form">
           <input type="hidden" id="user-id">
           <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-2">名前 <span class="text-red-500">*</span></label>
-            <input type="text" id="user-name" class="w-full border rounded-lg px-3 py-2" required>
+            <input type="text" id="user-name" class="w-full border rounded-lg px-3 py-2 text-base" required>
           </div>
           <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-2">メールアドレス <span class="text-red-500">*</span></label>
-            <input type="email" id="user-email" class="w-full border rounded-lg px-3 py-2" required>
+            <input type="email" id="user-email" class="w-full border rounded-lg px-3 py-2 text-base" required>
           </div>
           <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-2">パスワード <span id="password-required" class="text-red-500">*</span></label>
-            <input type="password" id="user-password" class="w-full border rounded-lg px-3 py-2" placeholder="4文字以上">
+            <input type="password" id="user-password" class="w-full border rounded-lg px-3 py-2 text-base" placeholder="4文字以上">
             <p id="password-hint" class="text-xs text-gray-500 mt-1">編集時は空欄のままで変更なし</p>
           </div>
           <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-2">権限 <span class="text-red-500">*</span></label>
-            <select id="user-role" class="w-full border rounded-lg px-3 py-2" required>
+            <select id="user-role" class="w-full border rounded-lg px-3 py-2 text-base" required>
               <option value="participant">参加者（チームMTG・全体会議のみ）</option>
-              <option value="manager">マネージャー（本部会議・管理機能も可能）</option>
-              <option value="executive">経営層（戦略会議・全機能可能）</option>
+              <option value="manager">マネージャー（本部会議・管理可）</option>
+              <option value="executive">経営層（全機能可能）</option>
             </select>
           </div>
           <div id="user-error" class="mb-4 text-red-600 text-sm hidden"></div>
-          <div class="flex justify-end space-x-2">
-            <button type="button" onclick="closeUserModal()" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">キャンセル</button>
-            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+          <div class="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:space-x-2">
+            <button type="button" onclick="closeUserModal()" class="w-full sm:w-auto px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">キャンセル</button>
+            <button type="submit" class="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
               <i class="fas fa-save mr-2"></i>保存
             </button>
           </div>
@@ -1579,14 +1675,15 @@ app.get('/admin', (c) => {
       
       function renderUsersTab() {
         const html = \`
-          <div class="flex justify-between items-center mb-4">
-            <input type="text" id="user-search" placeholder="ユーザーを検索..." class="border rounded-lg px-3 py-2 w-64" oninput="filterUsers()">
-            <button onclick="openUserModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+          <div class="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 mb-4">
+            <input type="text" id="user-search" placeholder="ユーザーを検索..." class="border rounded-lg px-3 py-2 w-full sm:w-64 text-base" oninput="filterUsers()">
+            <button onclick="openUserModal()" class="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
               <i class="fas fa-plus mr-2"></i>ユーザー追加
             </button>
           </div>
           
-          <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+          <!-- Desktop Table -->
+          <div class="bg-white rounded-lg shadow-sm overflow-hidden admin-table">
             <table class="w-full">
               <thead class="bg-gray-50">
                 <tr>
@@ -1607,10 +1704,10 @@ app.get('/admin', (c) => {
                       <span class="px-2 py-1 rounded-full text-xs font-medium \${roleColors[u.role]}">\${roleLabels[u.role]}</span>
                     </td>
                     <td class="px-4 py-3 text-right">
-                      <button onclick="editUser(\${u.id})" class="text-blue-600 hover:text-blue-800 mr-2">
+                      <button onclick="editUser(\${u.id})" class="text-blue-600 hover:text-blue-800 mr-2 p-2">
                         <i class="fas fa-edit"></i>
                       </button>
-                      <button onclick="confirmDeleteUser(\${u.id}, '\${u.name}')" class="text-red-600 hover:text-red-800">
+                      <button onclick="confirmDeleteUser(\${u.id}, '\${u.name}')" class="text-red-600 hover:text-red-800 p-2">
                         <i class="fas fa-trash"></i>
                       </button>
                     </td>
@@ -1618,6 +1715,31 @@ app.get('/admin', (c) => {
                 \`).join('')}
               </tbody>
             </table>
+          </div>
+          
+          <!-- Mobile Cards -->
+          <div class="admin-cards space-y-3" style="display: none;">
+            \${allUsers.map(u => \`
+              <div class="bg-white rounded-lg shadow-sm p-4 user-row" data-name="\${u.name.toLowerCase()}" data-email="\${u.email.toLowerCase()}">
+                <div class="flex items-start justify-between">
+                  <div class="flex-1">
+                    <div class="font-medium text-gray-800 text-lg">\${u.name}</div>
+                    <div class="text-sm text-gray-600 mt-1 break-all">\${u.email}</div>
+                    <div class="mt-2">
+                      <span class="px-2 py-1 rounded-full text-xs font-medium \${roleColors[u.role]}">\${roleLabels[u.role]}</span>
+                    </div>
+                  </div>
+                  <div class="flex flex-col gap-2 ml-3">
+                    <button onclick="editUser(\${u.id})" class="text-blue-600 hover:text-blue-800 p-2 bg-blue-50 rounded-lg">
+                      <i class="fas fa-edit"></i>
+                    </button>
+                    <button onclick="confirmDeleteUser(\${u.id}, '\${u.name}')" class="text-red-600 hover:text-red-800 p-2 bg-red-50 rounded-lg">
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            \`).join('')}
           </div>
         \`;
         
@@ -1627,12 +1749,12 @@ app.get('/admin', (c) => {
       function renderTeamsTab() {
         const html = \`
           <div class="flex justify-end mb-4">
-            <button onclick="openTeamModal()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+            <button onclick="openTeamModal()" class="w-full sm:w-auto px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
               <i class="fas fa-plus mr-2"></i>チーム追加
             </button>
           </div>
           
-          <div class="grid gap-4 md:grid-cols-2">
+          <div class="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-2">
             \${allTeams.map(t => \`
               <div class="bg-white rounded-lg shadow-sm p-4" id="team-card-\${t.id}">
                 <div class="flex items-center justify-between mb-3">

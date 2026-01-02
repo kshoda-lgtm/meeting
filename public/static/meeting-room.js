@@ -127,33 +127,33 @@ function renderMeetingRoom() {
   
   const html = `
     <!-- Meeting Header -->
-    <div class="bg-white rounded-lg shadow-sm p-4 mb-4">
-      <div class="flex items-center justify-between">
-        <div>
-          <div class="flex items-center space-x-2 mb-1">
-            <span class="px-2 py-1 bg-blue-100 text-blue-700 text-sm rounded">${meeting.meeting_type_name}</span>
-            ${meeting.team_name ? `<span class="text-gray-500 text-sm">${meeting.team_name}</span>` : ''}
+    <div class="bg-white rounded-lg shadow-sm p-3 sm:p-4 mb-3 sm:mb-4">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div class="flex-1">
+          <div class="flex flex-wrap items-center gap-2 mb-1">
+            <span class="px-2 py-1 bg-blue-100 text-blue-700 text-xs sm:text-sm rounded">${meeting.meeting_type_name}</span>
+            ${meeting.team_name ? `<span class="text-gray-500 text-xs sm:text-sm">${meeting.team_name}</span>` : ''}
             <span class="status-badge ${meeting.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}">
               ${meeting.status === 'scheduled' ? '予定' : meeting.status === 'active' ? '開催中' : '完了'}
             </span>
           </div>
-          <h1 class="text-xl font-bold text-gray-800">${meeting.title}</h1>
-          <p class="text-sm text-gray-500 mt-1">
+          <h1 class="text-lg sm:text-xl font-bold text-gray-800">${meeting.title}</h1>
+          <p class="text-xs sm:text-sm text-gray-500 mt-1">
             <i class="far fa-calendar-alt mr-1"></i>
             ${dayjs(meeting.scheduled_at).format('YYYY年M月D日(ddd) HH:mm')}
           </p>
         </div>
-        <div class="flex items-center space-x-2">
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:space-x-2">
           ${meeting.status === 'scheduled' ? `
-            <button onclick="startMeeting()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+            <button onclick="startMeeting()" class="w-full sm:w-auto px-4 py-3 sm:py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center justify-center">
               <i class="fas fa-play mr-2"></i>会議を開始
             </button>
           ` : ''}
           ${meeting.status === 'active' ? `
-            <button onclick="openCheckinModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+            <button onclick="openCheckinModal()" class="w-full sm:w-auto px-4 py-3 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center">
               <i class="fas fa-hand-paper mr-2"></i>チェックイン
             </button>
-            <button onclick="checkEndMeeting()" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">
+            <button onclick="checkEndMeeting()" class="w-full sm:w-auto px-4 py-3 sm:py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 flex items-center justify-center">
               <i class="fas fa-flag-checkered mr-2"></i>終了
             </button>
           ` : ''}
@@ -162,9 +162,9 @@ function renderMeetingRoom() {
     </div>
     
     <!-- Main Content Grid -->
-    <div class="grid grid-cols-3 gap-4">
-      <!-- Left Column: Main Content -->
-      <div class="col-span-2 space-y-4">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 meeting-room-grid">
+      <!-- Left Column: Main Content (on mobile, this appears second) -->
+      <div class="lg:col-span-2 space-y-3 sm:space-y-4 order-2 lg:order-1">
         ${isManager ? renderQuickCapture() : ''}
         
         <!-- Type-specific sections -->
@@ -183,8 +183,8 @@ function renderMeetingRoom() {
         ${renderLinkSection()}
       </div>
       
-      <!-- Right Column: Radar & Check-ins -->
-      <div class="space-y-4">
+      <!-- Right Column: Radar & Check-ins (on mobile, this appears first) -->
+      <div class="space-y-3 sm:space-y-4 order-1 lg:order-2">
         ${renderRadarSection()}
         ${renderCheckInSummary()}
         ${renderParticipants()}
@@ -198,17 +198,17 @@ function renderMeetingRoom() {
 // Quick Capture (Manager only)
 function renderQuickCapture() {
   return `
-    <div class="bg-white rounded-lg shadow-sm p-4">
-      <div class="flex items-center space-x-2">
+    <div class="bg-white rounded-lg shadow-sm p-3 sm:p-4">
+      <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:space-x-2 quick-capture-mobile">
         <input type="text" id="quick-capture-input" 
-          class="flex-1 border rounded-lg px-4 py-2 quick-capture-input" 
-          placeholder="D: 決定事項 / A: アクション / I: 保留箱 (デフォルト: A)"
+          class="flex-1 border rounded-lg px-4 py-3 sm:py-2 quick-capture-input text-base" 
+          placeholder="D: 決定 / A: Action / I: 保留"
           onkeydown="if(event.key === 'Enter') submitQuickCapture()">
-        <button onclick="submitQuickCapture()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-          <i class="fas fa-plus"></i>
+        <button onclick="submitQuickCapture()" class="px-4 py-3 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center">
+          <i class="fas fa-plus mr-2 sm:mr-0"></i><span class="sm:hidden">追加</span>
         </button>
       </div>
-      <p class="text-xs text-gray-500 mt-2">
+      <p class="text-xs text-gray-500 mt-2 hidden sm:block">
         ショートカット: D: (決定), A: (Action), I: (保留箱) 例: "D: 予算承認"
       </p>
     </div>
@@ -240,22 +240,24 @@ function renderAgendaSection() {
   const isManager = canManageCurrentMeeting;
   
   return `
-    <div class="bg-white rounded-lg shadow-sm">
-      <div class="p-4 border-b flex items-center justify-between">
-        <h3 class="font-bold text-gray-800"><i class="fas fa-list-ul mr-2 text-blue-600"></i>今日の議題</h3>
-        ${isManager ? `<button onclick="openAddModal('agenda')" class="text-blue-600 hover:text-blue-800 text-sm"><i class="fas fa-plus mr-1"></i>追加</button>` : ''}
+    <div class="bg-white rounded-lg shadow-sm section-card">
+      <div class="p-3 sm:p-4 border-b flex items-center justify-between">
+        <h3 class="font-bold text-gray-800 text-sm sm:text-base"><i class="fas fa-list-ul mr-2 text-blue-600"></i>今日の議題</h3>
+        ${isManager ? `<button onclick="openAddModal('agenda')" class="text-blue-600 hover:text-blue-800 text-sm p-2 -m-2"><i class="fas fa-plus mr-1"></i>追加</button>` : ''}
       </div>
       <div class="divide-y">
-        ${items.length === 0 ? '<div class="p-4 text-gray-500 text-sm">議題がありません</div>' : ''}
+        ${items.length === 0 ? '<div class="p-3 sm:p-4 text-gray-500 text-sm">議題がありません</div>' : ''}
         ${items.map((item, idx) => `
-          <div class="p-3 flex items-center justify-between hover:bg-gray-50 ${item.is_from_broadcast ? 'bg-yellow-50' : ''}">
-            <div class="flex items-center space-x-3">
+          <div class="p-3 flex items-start sm:items-center justify-between hover:bg-gray-50 ${item.is_from_broadcast ? 'bg-yellow-50' : ''}">
+            <div class="flex items-start sm:items-center gap-2 sm:space-x-3 flex-1">
               <span class="text-gray-400 text-sm">${idx + 1}.</span>
-              <span class="text-gray-800">${item.content}</span>
-              ${item.is_from_broadcast ? '<span class="text-xs text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded">会社決定</span>' : ''}
+              <div class="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 flex-1">
+                <span class="text-gray-800 text-sm sm:text-base">${item.content}</span>
+                ${item.is_from_broadcast ? '<span class="text-xs text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded self-start">会社決定</span>' : ''}
+              </div>
             </div>
             ${isManager ? `
-              <button onclick="deleteAgendaItem(${item.id})" class="text-gray-400 hover:text-red-500">
+              <button onclick="deleteAgendaItem(${item.id})" class="text-gray-400 hover:text-red-500 p-2 -m-2 ml-2">
                 <i class="fas fa-times"></i>
               </button>
             ` : ''}
@@ -272,32 +274,32 @@ function renderDecisionSection() {
   const isManager = canManageCurrentMeeting;
   
   return `
-    <div class="bg-white rounded-lg shadow-sm">
-      <div class="p-4 border-b flex items-center justify-between">
-        <h3 class="font-bold text-gray-800"><i class="fas fa-gavel mr-2 text-green-600"></i>決定事項</h3>
-        <button onclick="openAddModal('decision')" class="text-blue-600 hover:text-blue-800 text-sm"><i class="fas fa-plus mr-1"></i>追加</button>
+    <div class="bg-white rounded-lg shadow-sm section-card">
+      <div class="p-3 sm:p-4 border-b flex items-center justify-between">
+        <h3 class="font-bold text-gray-800 text-sm sm:text-base"><i class="fas fa-gavel mr-2 text-green-600"></i>決定事項</h3>
+        <button onclick="openAddModal('decision')" class="text-blue-600 hover:text-blue-800 text-sm p-2 -m-2"><i class="fas fa-plus mr-1"></i>追加</button>
       </div>
       <div class="divide-y">
-        ${items.length === 0 ? '<div class="p-4 text-gray-500 text-sm">決定事項がありません</div>' : ''}
+        ${items.length === 0 ? '<div class="p-3 sm:p-4 text-gray-500 text-sm">決定事項がありません</div>' : ''}
         ${items.map(item => `
           <div class="p-3 hover:bg-gray-50">
-            <div class="flex items-start justify-between">
+            <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
               <div class="flex-1">
-                <div class="flex items-center space-x-2">
+                <div class="flex items-start gap-2">
                   ${item.is_confirmed ? 
-                    '<span class="text-green-600"><i class="fas fa-check-circle"></i></span>' :
-                    '<span class="text-yellow-500"><i class="far fa-circle"></i></span>'
+                    '<span class="text-green-600 mt-0.5"><i class="fas fa-check-circle"></i></span>' :
+                    '<span class="text-yellow-500 mt-0.5"><i class="far fa-circle"></i></span>'
                   }
-                  <span class="text-gray-800">${item.content}</span>
+                  <span class="text-gray-800 text-sm sm:text-base">${item.content}</span>
                 </div>
-                ${item.related_link ? `<a href="${item.related_link}" target="_blank" class="text-sm text-blue-500 hover:underline ml-6"><i class="fas fa-link mr-1"></i>関連リンク</a>` : ''}
+                ${item.related_link ? `<a href="${item.related_link}" target="_blank" class="text-sm text-blue-500 hover:underline ml-6 block mt-1"><i class="fas fa-link mr-1"></i>関連リンク</a>` : ''}
                 <div class="text-xs text-gray-500 mt-1 ml-6">
                   ${item.creator_name || ''} ${dayjs(item.created_at).format('HH:mm')}
                 </div>
               </div>
               ${isManager && !item.is_confirmed ? `
-                <button onclick="confirmDecision(${item.id})" class="px-3 py-1 bg-green-100 text-green-700 rounded text-sm hover:bg-green-200">
-                  確定
+                <button onclick="confirmDecision(${item.id})" class="w-full sm:w-auto px-4 py-2 sm:px-3 sm:py-1 bg-green-100 text-green-700 rounded text-sm hover:bg-green-200 flex items-center justify-center">
+                  <i class="fas fa-check mr-1 sm:hidden"></i>確定
                 </button>
               ` : ''}
             </div>
@@ -314,35 +316,33 @@ function renderActionSection() {
   const isManager = canManageCurrentMeeting;
   
   return `
-    <div class="bg-white rounded-lg shadow-sm">
-      <div class="p-4 border-b flex items-center justify-between">
-        <h3 class="font-bold text-gray-800"><i class="fas fa-tasks mr-2 text-purple-600"></i>次やること</h3>
-        <button onclick="openAddModal('action')" class="text-blue-600 hover:text-blue-800 text-sm"><i class="fas fa-plus mr-1"></i>追加</button>
+    <div class="bg-white rounded-lg shadow-sm section-card">
+      <div class="p-3 sm:p-4 border-b flex items-center justify-between">
+        <h3 class="font-bold text-gray-800 text-sm sm:text-base"><i class="fas fa-tasks mr-2 text-purple-600"></i>次やること</h3>
+        <button onclick="openAddModal('action')" class="text-blue-600 hover:text-blue-800 text-sm p-2 -m-2"><i class="fas fa-plus mr-1"></i>追加</button>
       </div>
       <div class="divide-y">
-        ${items.length === 0 ? '<div class="p-4 text-gray-500 text-sm">アクションがありません</div>' : ''}
+        ${items.length === 0 ? '<div class="p-3 sm:p-4 text-gray-500 text-sm">アクションがありません</div>' : ''}
         ${items.map(item => `
           <div class="p-3 hover:bg-gray-50 ${item.is_tentative ? 'bg-yellow-50' : ''}">
-            <div class="flex items-start justify-between">
-              <div class="flex-1">
-                <div class="flex items-center space-x-2 flex-wrap">
-                  <span class="status-badge action-status-${item.status}">${statusLabels[item.status]}</span>
-                  ${item.is_tentative ? '<span class="text-xs text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded">未確定</span>' : ''}
-                  <span class="text-gray-800">${item.content}</span>
-                </div>
-                <div class="flex items-center space-x-4 mt-2 text-sm text-gray-500">
-                  ${item.assignee_name ? `<span><i class="fas fa-user mr-1"></i>${item.assignee_name}</span>` : '<span class="text-yellow-600"><i class="fas fa-user-slash mr-1"></i>担当未定</span>'}
-                  ${item.due_date ? `<span><i class="far fa-calendar mr-1"></i>${dayjs(item.due_date).format('M/D')}</span>` : '<span class="text-yellow-600"><i class="far fa-calendar-times mr-1"></i>期限未定</span>'}
-                  ${item.completion_criteria ? `<span class="text-gray-400"><i class="fas fa-flag-checkered mr-1"></i>${item.completion_criteria}</span>` : ''}
-                </div>
-                ${item.waiting_reason ? `<div class="text-sm text-red-500 mt-1"><i class="fas fa-hourglass-half mr-1"></i>${item.waiting_reason}</div>` : ''}
+            <div class="flex flex-col gap-2">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="status-badge action-status-${item.status}">${statusLabels[item.status]}</span>
+                ${item.is_tentative ? '<span class="text-xs text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded">未確定</span>' : ''}
               </div>
-              <div class="flex items-center space-x-2">
-                <select onchange="updateActionStatus(${item.id}, this.value)" class="text-xs border rounded px-2 py-1" ${!isManager && item.assignee_id !== meetingUser.id ? 'disabled' : ''}>
+              <span class="text-gray-800 text-sm sm:text-base">${item.content}</span>
+              <div class="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-500">
+                ${item.assignee_name ? `<span><i class="fas fa-user mr-1"></i>${item.assignee_name}</span>` : '<span class="text-yellow-600"><i class="fas fa-user-slash mr-1"></i>担当未定</span>'}
+                ${item.due_date ? `<span><i class="far fa-calendar mr-1"></i>${dayjs(item.due_date).format('M/D')}</span>` : '<span class="text-yellow-600"><i class="far fa-calendar-times mr-1"></i>期限未定</span>'}
+              </div>
+              ${item.completion_criteria ? `<div class="text-xs text-gray-400"><i class="fas fa-flag-checkered mr-1"></i>${item.completion_criteria}</div>` : ''}
+              ${item.waiting_reason ? `<div class="text-xs sm:text-sm text-red-500"><i class="fas fa-hourglass-half mr-1"></i>${item.waiting_reason}</div>` : ''}
+              <div class="flex items-center gap-2 mt-1">
+                <select onchange="updateActionStatus(${item.id}, this.value)" class="text-sm border rounded px-3 py-2 flex-1 sm:flex-none sm:w-auto" ${!isManager && item.assignee_id !== meetingUser.id ? 'disabled' : ''}>
                   ${Object.entries(statusLabels).map(([k, v]) => `<option value="${k}" ${item.status === k ? 'selected' : ''}>${v}</option>`).join('')}
                 </select>
                 ${isManager ? `
-                  <button onclick="editAction(${item.id})" class="text-gray-400 hover:text-blue-500"><i class="fas fa-edit"></i></button>
+                  <button onclick="editAction(${item.id})" class="text-gray-400 hover:text-blue-500 p-2"><i class="fas fa-edit"></i></button>
                 ` : ''}
               </div>
             </div>
@@ -358,34 +358,32 @@ function renderIssueSection() {
   const items = meeting.issues || [];
   
   return `
-    <div class="bg-white rounded-lg shadow-sm">
-      <div class="p-4 border-b flex items-center justify-between">
-        <h3 class="font-bold text-gray-800"><i class="fas fa-inbox mr-2 text-orange-600"></i>保留箱</h3>
-        <button onclick="openAddModal('issue')" class="text-blue-600 hover:text-blue-800 text-sm"><i class="fas fa-plus mr-1"></i>追加</button>
+    <div class="bg-white rounded-lg shadow-sm section-card">
+      <div class="p-3 sm:p-4 border-b flex items-center justify-between">
+        <h3 class="font-bold text-gray-800 text-sm sm:text-base"><i class="fas fa-inbox mr-2 text-orange-600"></i>保留箱</h3>
+        <button onclick="openAddModal('issue')" class="text-blue-600 hover:text-blue-800 text-sm p-2 -m-2"><i class="fas fa-plus mr-1"></i>追加</button>
       </div>
       <div class="divide-y">
-        ${items.length === 0 ? '<div class="p-4 text-gray-500 text-sm">保留事項がありません</div>' : ''}
+        ${items.length === 0 ? '<div class="p-3 sm:p-4 text-gray-500 text-sm">保留事項がありません</div>' : ''}
         ${items.map(item => `
           <div class="p-3 hover:bg-gray-50">
-            <div class="flex items-start justify-between">
-              <div class="flex-1">
-                <div class="flex items-center space-x-2">
-                  <span class="status-badge issue-state-${item.state}">${stateLabels[item.state]}</span>
-                  <span class="text-gray-800">${item.content}</span>
-                  ${item.times_postponed >= 2 ? `<span class="text-xs text-red-500"><i class="fas fa-exclamation-triangle"></i> ${item.times_postponed}回送り</span>` : ''}
-                </div>
-                <div class="text-sm text-gray-500 mt-1">
-                  ${item.owner_name ? `<span class="mr-2"><i class="fas fa-user mr-1"></i>${item.owner_name}</span>` : ''}
-                  ${item.team_name ? `<span class="mr-2"><i class="fas fa-users mr-1"></i>${item.team_name}</span>` : ''}
-                  ${item.client_name ? `<span><i class="fas fa-building mr-1"></i>${item.client_name}</span>` : ''}
-                </div>
+            <div class="flex flex-col gap-2">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="status-badge issue-state-${item.state}">${stateLabels[item.state]}</span>
+                ${item.times_postponed >= 2 ? `<span class="text-xs text-red-500"><i class="fas fa-exclamation-triangle"></i> ${item.times_postponed}回送り</span>` : ''}
               </div>
-              <div class="flex items-center space-x-2">
-                <button onclick="convertIssueToAction(${item.id})" class="text-blue-500 hover:text-blue-700 tooltip" data-tip="Action化">
-                  <i class="fas fa-arrow-right"></i>
+              <span class="text-gray-800 text-sm sm:text-base">${item.content}</span>
+              <div class="flex flex-wrap gap-2 text-xs sm:text-sm text-gray-500">
+                ${item.owner_name ? `<span><i class="fas fa-user mr-1"></i>${item.owner_name}</span>` : ''}
+                ${item.team_name ? `<span><i class="fas fa-users mr-1"></i>${item.team_name}</span>` : ''}
+                ${item.client_name ? `<span><i class="fas fa-building mr-1"></i>${item.client_name}</span>` : ''}
+              </div>
+              <div class="flex items-center gap-2 mt-1">
+                <button onclick="convertIssueToAction(${item.id})" class="flex-1 sm:flex-none px-4 py-2 bg-blue-50 text-blue-600 rounded text-sm hover:bg-blue-100 flex items-center justify-center">
+                  <i class="fas fa-arrow-right mr-2"></i>Action化
                 </button>
-                <button onclick="resolveIssue(${item.id})" class="text-green-500 hover:text-green-700 tooltip" data-tip="解決">
-                  <i class="fas fa-check"></i>
+                <button onclick="resolveIssue(${item.id})" class="flex-1 sm:flex-none px-4 py-2 bg-green-50 text-green-600 rounded text-sm hover:bg-green-100 flex items-center justify-center">
+                  <i class="fas fa-check mr-2"></i>解決
                 </button>
               </div>
             </div>
@@ -402,20 +400,20 @@ function renderLinkSection() {
   const isManager = canManageCurrentMeeting;
   
   return `
-    <div class="bg-white rounded-lg shadow-sm">
-      <div class="p-4 border-b flex items-center justify-between">
-        <h3 class="font-bold text-gray-800"><i class="fas fa-link mr-2 text-gray-600"></i>資料リンク</h3>
-        <button onclick="openAddModal('link')" class="text-blue-600 hover:text-blue-800 text-sm"><i class="fas fa-plus mr-1"></i>追加</button>
+    <div class="bg-white rounded-lg shadow-sm section-card">
+      <div class="p-3 sm:p-4 border-b flex items-center justify-between">
+        <h3 class="font-bold text-gray-800 text-sm sm:text-base"><i class="fas fa-link mr-2 text-gray-600"></i>資料リンク</h3>
+        <button onclick="openAddModal('link')" class="text-blue-600 hover:text-blue-800 text-sm p-2 -m-2"><i class="fas fa-plus mr-1"></i>追加</button>
       </div>
       <div class="divide-y">
-        ${items.length === 0 ? '<div class="p-4 text-gray-500 text-sm">リンクがありません</div>' : ''}
+        ${items.length === 0 ? '<div class="p-3 sm:p-4 text-gray-500 text-sm">リンクがありません</div>' : ''}
         ${items.map(item => `
-          <div class="p-3 hover:bg-gray-50 flex items-center justify-between">
-            <a href="${item.url}" target="_blank" class="text-blue-600 hover:underline flex items-center">
-              <i class="fas fa-external-link-alt mr-2"></i>
-              ${item.title || item.url}
+          <div class="p-3 hover:bg-gray-50 flex items-center justify-between gap-2">
+            <a href="${item.url}" target="_blank" class="text-blue-600 hover:underline flex items-center text-sm sm:text-base flex-1 min-w-0">
+              <i class="fas fa-external-link-alt mr-2 flex-shrink-0"></i>
+              <span class="truncate">${item.title || item.url}</span>
             </a>
-            ${isManager ? `<button onclick="deleteLink(${item.id})" class="text-gray-400 hover:text-red-500"><i class="fas fa-times"></i></button>` : ''}
+            ${isManager ? `<button onclick="deleteLink(${item.id})" class="text-gray-400 hover:text-red-500 p-2 -m-2 flex-shrink-0"><i class="fas fa-times"></i></button>` : ''}
           </div>
         `).join('')}
       </div>
@@ -429,13 +427,13 @@ function renderRadarSection() {
   const activeItems = items.filter(i => !i.snooze_until);
   
   return `
-    <div class="bg-white rounded-lg shadow-sm">
-      <div class="p-4 border-b">
-        <h3 class="font-bold text-gray-800"><i class="fas fa-radar mr-2 text-red-600"></i>要処理（レーダー）</h3>
+    <div class="bg-white rounded-lg shadow-sm section-card">
+      <div class="p-3 sm:p-4 border-b">
+        <h3 class="font-bold text-gray-800 text-sm sm:text-base"><i class="fas fa-exclamation-triangle mr-2 text-red-600"></i>要処理（レーダー）</h3>
         <p class="text-xs text-gray-500">停滞検知された項目</p>
       </div>
       <div class="max-h-64 overflow-y-auto">
-        ${activeItems.length === 0 ? '<div class="p-4 text-gray-500 text-sm text-center"><i class="fas fa-check-circle text-green-500 mr-1"></i>問題なし</div>' : ''}
+        ${activeItems.length === 0 ? '<div class="p-3 sm:p-4 text-gray-500 text-sm text-center"><i class="fas fa-check-circle text-green-500 mr-1"></i>問題なし</div>' : ''}
         ${activeItems.map(item => {
           const typeLabels = {
             overdue_action: '期限超過',
@@ -446,18 +444,18 @@ function renderRadarSection() {
           };
           return `
             <div class="p-3 border-b radar-item">
-              <div class="flex items-start justify-between">
+              <div class="flex items-start gap-2">
                 <div class="flex-1">
                   <div class="text-xs text-red-600 font-medium mb-1">${typeLabels[item.type]}</div>
                   <p class="text-sm text-gray-800">${item.content}</p>
-                  <div class="text-xs text-gray-500 mt-1">
-                    ${item.assignee_name ? `担当: ${item.assignee_name}` : ''}
-                    ${item.due_date ? ` / 期限: ${dayjs(item.due_date).format('M/D')}` : ''}
-                    ${item.days_stagnant ? ` / ${item.days_stagnant}日停滞` : ''}
-                    ${item.times_postponed ? ` / ${item.times_postponed}回送り` : ''}
+                  <div class="flex flex-wrap gap-1 text-xs text-gray-500 mt-1">
+                    ${item.assignee_name ? `<span>担当: ${item.assignee_name}</span>` : ''}
+                    ${item.due_date ? `<span>期限: ${dayjs(item.due_date).format('M/D')}</span>` : ''}
+                    ${item.days_stagnant ? `<span>${item.days_stagnant}日停滞</span>` : ''}
+                    ${item.times_postponed ? `<span>${item.times_postponed}回送り</span>` : ''}
                   </div>
                 </div>
-                <button onclick="openSnoozeModal('${item.entity_type}', ${item.entity_id})" class="text-gray-400 hover:text-gray-600 tooltip" data-tip="スヌーズ">
+                <button onclick="openSnoozeModal('${item.entity_type}', ${item.entity_id})" class="text-gray-400 hover:text-gray-600 p-2 -m-2">
                   <i class="fas fa-clock"></i>
                 </button>
               </div>
@@ -478,26 +476,26 @@ function renderCheckInSummary() {
   const needsHelpCount = checkIns.filter(c => c.needs_help).length;
   
   return `
-    <div class="bg-white rounded-lg shadow-sm">
-      <div class="p-4 border-b">
-        <h3 class="font-bold text-gray-800"><i class="fas fa-hand-paper mr-2 text-blue-600"></i>チェックイン</h3>
+    <div class="bg-white rounded-lg shadow-sm section-card">
+      <div class="p-3 sm:p-4 border-b">
+        <h3 class="font-bold text-gray-800 text-sm sm:text-base"><i class="fas fa-hand-paper mr-2 text-blue-600"></i>チェックイン</h3>
       </div>
-      <div class="p-4">
-        <div class="grid grid-cols-2 gap-4 mb-4">
-          <div class="text-center">
-            <div class="text-2xl font-bold text-blue-600">${avgConfidence}</div>
+      <div class="p-3 sm:p-4">
+        <div class="grid grid-cols-2 gap-3 sm:gap-4 mb-3 sm:mb-4">
+          <div class="text-center bg-blue-50 rounded-lg p-3">
+            <div class="text-xl sm:text-2xl font-bold text-blue-600">${avgConfidence}</div>
             <div class="text-xs text-gray-500">平均確度</div>
           </div>
-          <div class="text-center">
-            <div class="text-2xl font-bold ${needsHelpCount > 0 ? 'text-red-600' : 'text-green-600'}">${needsHelpCount}</div>
+          <div class="text-center ${needsHelpCount > 0 ? 'bg-red-50' : 'bg-green-50'} rounded-lg p-3">
+            <div class="text-xl sm:text-2xl font-bold ${needsHelpCount > 0 ? 'text-red-600' : 'text-green-600'}">${needsHelpCount}</div>
             <div class="text-xs text-gray-500">助け必要</div>
           </div>
         </div>
         <div class="space-y-2">
           ${checkIns.slice(0, 5).map(c => `
-            <div class="flex items-center justify-between text-sm">
+            <div class="flex items-center justify-between text-sm py-1">
               <span class="text-gray-700">${c.is_anonymous ? '匿名' : c.user_name}</span>
-              <div class="flex items-center space-x-2">
+              <div class="flex items-center gap-2">
                 <span class="font-medium ${c.confidence_score >= 7 ? 'text-green-600' : c.confidence_score >= 4 ? 'text-yellow-600' : 'text-red-600'}">${c.confidence_score}</span>
                 <span class="status-badge issue-state-${c.uncertainty_factor}" style="font-size: 0.65rem;">${stateLabels[c.uncertainty_factor]}</span>
                 ${c.needs_help ? '<i class="fas fa-exclamation-circle text-red-500"></i>' : ''}
@@ -515,14 +513,14 @@ function renderParticipants() {
   const participants = meeting.participants || [];
   
   return `
-    <div class="bg-white rounded-lg shadow-sm">
-      <div class="p-4 border-b">
-        <h3 class="font-bold text-gray-800"><i class="fas fa-users mr-2 text-gray-600"></i>参加者</h3>
+    <div class="bg-white rounded-lg shadow-sm section-card">
+      <div class="p-3 sm:p-4 border-b">
+        <h3 class="font-bold text-gray-800 text-sm sm:text-base"><i class="fas fa-users mr-2 text-gray-600"></i>参加者</h3>
       </div>
-      <div class="p-4">
+      <div class="p-3 sm:p-4">
         <div class="flex flex-wrap gap-2">
           ${participants.map(p => `
-            <span class="px-2 py-1 bg-gray-100 rounded text-sm text-gray-700 ${p.meeting_role === 'manager' ? 'border border-blue-300' : ''}">
+            <span class="px-3 py-1.5 bg-gray-100 rounded text-sm text-gray-700 ${p.meeting_role === 'manager' ? 'border border-blue-300' : ''}">
               ${p.meeting_role === 'manager' ? '<i class="fas fa-crown text-yellow-500 mr-1"></i>' : ''}
               ${p.name}
             </span>
