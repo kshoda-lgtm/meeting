@@ -139,6 +139,40 @@ api.get('/auth/me', async (c) => {
   });
 });
 
+// ==================== Organizations ====================
+api.get('/organizations', async (c) => {
+  const { results } = await c.env.DB.prepare(
+    'SELECT * FROM organizations ORDER BY name'
+  ).all();
+  return c.json(results);
+});
+
+api.get('/organizations/:id', async (c) => {
+  const id = c.req.param('id');
+  const result = await c.env.DB.prepare(
+    'SELECT * FROM organizations WHERE id = ?'
+  ).bind(id).first();
+  if (!result) return c.json({ error: 'Organization not found' }, 404);
+  return c.json(result);
+});
+
+api.put('/organizations/:id', async (c) => {
+  const user = await getCurrentUser(c);
+  if (!user || user.role !== 'executive') {
+    return c.json({ error: '権限がありません' }, 403);
+  }
+  
+  const id = c.req.param('id');
+  const body = await c.req.json();
+  const { name } = body;
+  
+  const result = await c.env.DB.prepare(
+    'UPDATE organizations SET name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? RETURNING *'
+  ).bind(name, id).first();
+  
+  return c.json(result);
+});
+
 // ==================== Users ====================
 api.get('/users', async (c) => {
   const { results } = await c.env.DB.prepare(
@@ -156,12 +190,198 @@ api.get('/users/:id', async (c) => {
   return c.json(result);
 });
 
+api.post('/users', async (c) => {
+  const user = await getCurrentUser(c);
+  if (!user || !hasRoleAccess(user.role, 'manager')) {
+    return c.json({ error: '権限がありません' }, 403);
+  }
+  
+  const body = await c.req.json();
+  const { name, email, role, organization_id } = body;
+  
+  // Check if email already exists
+  const existing = await c.env.DB.prepare(
+    'SELECT id FROM users WHERE email = ?'
+  ).bind(email).first();
+  
+  if (existing) {
+    return c.json({ error: 'このメールアドレスは既に登録されています' }, 400);
+  }
+  
+  const result = await c.env.DB.prepare(
+    'INSERT INTO users (organization_id, email, name, role) VALUES (?, ?, ?, ?) RETURNING *'
+  ).bind(organization_id, email, name, role || 'participant').first();
+  
+  return c.json(result, 201);
+});
+
+api.put('/users/:id', async (c) => {
+  const user = await getCurrentUser(c);
+  if (!user || !hasRoleAccess(user.role, 'manager')) {
+    return c.json({ error: '権限がありません' }, 403);
+  }
+  
+  const id = c.req.param('id');
+  const body = await c.req.json();
+  const { name, email, role } = body;
+  
+  // Check if email already exists for another user
+  const existing = await c.env.DB.prepare(
+    'SELECT id FROM users WHERE email = ? AND id != ?'
+  ).bind(email, id).first();
+  
+  if (existing) {
+    return c.json({ error: 'このメールアドレスは既に使用されています' }, 400);
+  }
+  
+  const result = await c.env.DB.prepare(
+    'UPDATE users SET name = ?, email = ?, role = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? RETURNING *'
+  ).bind(name, email, role, id).first();
+  
+  return c.json(result);
+});
+
+api.delete('/users/:id', async (c) => {
+  const user = await getCurrentUser(c);
+  if (!user || !hasRoleAccess(user.role, 'manager')) {
+    return c.json({ error: '権限がありません' }, 403);
+  }
+  
+  const id = c.req.param('id');
+  
+  // Prevent deleting yourself
+  if (user.id === parseInt(id)) {
+    return c.json({ error: '自分自身は削除できません' }, 400);
+  }
+  
+  // Delete user's team memberships first
+  await c.env.DB.prepare('DELETE FROM team_members WHERE user_id = ?').bind(id).run();
+  
+  // Delete user
+  await c.env.DB.prepare('DELETE FROM users WHERE id = ?').bind(id).run();
+  
+  return c.json({ success: true });
+});
+
 // ==================== Teams ====================
 api.get('/teams', async (c) => {
   const { results } = await c.env.DB.prepare(
     'SELECT * FROM teams ORDER BY name'
   ).all();
   return c.json(results);
+});
+
+api.get('/teams/:id', async (c) => {
+  const id = c.req.param('id');
+  const team = await c.env.DB.prepare(
+    'SELECT * FROM teams WHERE id = ?'
+  ).bind(id).first();
+  
+  if (!team) return c.json({ error: 'Team not found' }, 404);
+  
+  // Get team members
+  const { results: members } = await c.env.DB.prepare(`
+    SELECT u.id, u.name, u.email, u.role as user_role, tm.role as team_role
+    FROM users u
+    JOIN team_members tm ON u.id = tm.user_id
+    WHERE tm.team_id = ?
+    ORDER BY u.name
+  `).bind(id).all();
+  
+  return c.json({ ...team, members });
+});
+
+api.post('/teams', async (c) => {
+  const user = await getCurrentUser(c);
+  if (!user || !hasRoleAccess(user.role, 'manager')) {
+    return c.json({ error: '権限がありません' }, 403);
+  }
+  
+  const body = await c.req.json();
+  const { name, organization_id } = body;
+  
+  const result = await c.env.DB.prepare(
+    'INSERT INTO teams (organization_id, name) VALUES (?, ?) RETURNING *'
+  ).bind(organization_id || 1, name).first();
+  
+  return c.json(result, 201);
+});
+
+api.put('/teams/:id', async (c) => {
+  const user = await getCurrentUser(c);
+  if (!user || !hasRoleAccess(user.role, 'manager')) {
+    return c.json({ error: '権限がありません' }, 403);
+  }
+  
+  const id = c.req.param('id');
+  const body = await c.req.json();
+  const { name } = body;
+  
+  const result = await c.env.DB.prepare(
+    'UPDATE teams SET name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? RETURNING *'
+  ).bind(name, id).first();
+  
+  return c.json(result);
+});
+
+api.delete('/teams/:id', async (c) => {
+  const user = await getCurrentUser(c);
+  if (!user || !hasRoleAccess(user.role, 'manager')) {
+    return c.json({ error: '権限がありません' }, 403);
+  }
+  
+  const id = c.req.param('id');
+  
+  // Delete team memberships first
+  await c.env.DB.prepare('DELETE FROM team_members WHERE team_id = ?').bind(id).run();
+  
+  // Delete team
+  await c.env.DB.prepare('DELETE FROM teams WHERE id = ?').bind(id).run();
+  
+  return c.json({ success: true });
+});
+
+// ==================== Team Members ====================
+api.post('/teams/:id/members', async (c) => {
+  const user = await getCurrentUser(c);
+  if (!user || !hasRoleAccess(user.role, 'manager')) {
+    return c.json({ error: '権限がありません' }, 403);
+  }
+  
+  const teamId = c.req.param('id');
+  const body = await c.req.json();
+  const { user_id, role } = body;
+  
+  // Check if already a member
+  const existing = await c.env.DB.prepare(
+    'SELECT * FROM team_members WHERE team_id = ? AND user_id = ?'
+  ).bind(teamId, user_id).first();
+  
+  if (existing) {
+    return c.json({ error: '既にチームメンバーです' }, 400);
+  }
+  
+  const result = await c.env.DB.prepare(
+    'INSERT INTO team_members (team_id, user_id, role) VALUES (?, ?, ?) RETURNING *'
+  ).bind(teamId, user_id, role || 'participant').first();
+  
+  return c.json(result, 201);
+});
+
+api.delete('/teams/:teamId/members/:userId', async (c) => {
+  const user = await getCurrentUser(c);
+  if (!user || !hasRoleAccess(user.role, 'manager')) {
+    return c.json({ error: '権限がありません' }, 403);
+  }
+  
+  const teamId = c.req.param('teamId');
+  const userId = c.req.param('userId');
+  
+  await c.env.DB.prepare(
+    'DELETE FROM team_members WHERE team_id = ? AND user_id = ?'
+  ).bind(teamId, userId).run();
+  
+  return c.json({ success: true });
 });
 
 // ==================== Meeting Types ====================

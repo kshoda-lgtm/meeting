@@ -94,7 +94,13 @@ const renderPage = (title: string, content: string, scripts: string = '') => `
             }
           });
         } else {
-          links.querySelectorAll('a').forEach(a => a.style.display = '');
+          links.querySelectorAll('a:not(.admin-link)').forEach(a => a.style.display = '');
+          // Show admin link only for manager and executive
+          const adminLink = links.querySelector('.admin-link');
+          if (adminLink) {
+            const canAdmin = window.currentUser.role === 'manager' || window.currentUser.role === 'executive';
+            adminLink.style.display = canAdmin ? '' : 'none';
+          }
         }
       }
       
@@ -186,6 +192,7 @@ const renderPage = (title: string, content: string, scripts: string = '') => `
                 <a href="/issues" class="text-gray-600 hover:text-blue-600"><i class="fas fa-inbox mr-1"></i>保留箱</a>
                 <a href="/dashboard" class="text-gray-600 hover:text-blue-600"><i class="fas fa-chart-line mr-1"></i>ダッシュボード</a>
                 <a href="/triage" class="text-gray-600 hover:text-blue-600"><i class="fas fa-tasks mr-1"></i>一括整備</a>
+                <a href="/admin" class="text-gray-600 hover:text-blue-600 admin-link" style="display:none;"><i class="fas fa-cog mr-1"></i>管理</a>
             </div>
             <div id="user-menu" class="flex items-center space-x-3">
                 <!-- Dynamic user menu loaded by JS -->
@@ -1342,6 +1349,629 @@ app.get('/triage', (c) => {
   `;
   
   return c.html(renderPage('一括整備', content, scripts));
+});
+
+// Admin page - Organization, Teams, Users management
+app.get('/admin', (c) => {
+  const content = `
+    <div class="mb-6">
+      <h1 class="text-2xl font-bold text-gray-800 mb-2"><i class="fas fa-cog mr-2"></i>管理設定</h1>
+      <p class="text-gray-600">組織・チーム・ユーザーの管理</p>
+    </div>
+    
+    <div id="admin-content">
+      <div class="text-center py-8 text-gray-500">読み込み中...</div>
+    </div>
+    
+    <!-- User Modal -->
+    <div id="user-modal" class="modal">
+      <div class="modal-content p-6" style="max-width: 28rem;">
+        <h3 class="text-lg font-bold mb-4" id="user-modal-title"><i class="fas fa-user mr-2 text-blue-600"></i>ユーザー追加</h3>
+        <form id="user-form">
+          <input type="hidden" id="user-id">
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">名前 <span class="text-red-500">*</span></label>
+            <input type="text" id="user-name" class="w-full border rounded-lg px-3 py-2" required>
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">メールアドレス <span class="text-red-500">*</span></label>
+            <input type="email" id="user-email" class="w-full border rounded-lg px-3 py-2" required>
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">権限 <span class="text-red-500">*</span></label>
+            <select id="user-role" class="w-full border rounded-lg px-3 py-2" required>
+              <option value="participant">参加者（チームMTG・全体会議のみ）</option>
+              <option value="manager">マネージャー（本部会議・管理機能も可能）</option>
+              <option value="executive">経営層（戦略会議・全機能可能）</option>
+            </select>
+          </div>
+          <div id="user-error" class="mb-4 text-red-600 text-sm hidden"></div>
+          <div class="flex justify-end space-x-2">
+            <button type="button" onclick="closeUserModal()" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">キャンセル</button>
+            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+              <i class="fas fa-save mr-2"></i>保存
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+    
+    <!-- Team Modal -->
+    <div id="team-modal" class="modal">
+      <div class="modal-content p-6" style="max-width: 28rem;">
+        <h3 class="text-lg font-bold mb-4" id="team-modal-title"><i class="fas fa-users mr-2 text-green-600"></i>チーム追加</h3>
+        <form id="team-form">
+          <input type="hidden" id="team-id">
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">チーム名 <span class="text-red-500">*</span></label>
+            <input type="text" id="team-name" class="w-full border rounded-lg px-3 py-2" required>
+          </div>
+          <div id="team-error" class="mb-4 text-red-600 text-sm hidden"></div>
+          <div class="flex justify-end space-x-2">
+            <button type="button" onclick="closeTeamModal()" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">キャンセル</button>
+            <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+              <i class="fas fa-save mr-2"></i>保存
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+    
+    <!-- Add Member Modal -->
+    <div id="member-modal" class="modal">
+      <div class="modal-content p-6" style="max-width: 28rem;">
+        <h3 class="text-lg font-bold mb-4"><i class="fas fa-user-plus mr-2 text-blue-600"></i>メンバー追加</h3>
+        <form id="member-form">
+          <input type="hidden" id="member-team-id">
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">ユーザー <span class="text-red-500">*</span></label>
+            <select id="member-user-id" class="w-full border rounded-lg px-3 py-2" required>
+              <option value="">選択してください...</option>
+            </select>
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">チーム内役割</label>
+            <select id="member-role" class="w-full border rounded-lg px-3 py-2">
+              <option value="participant">メンバー</option>
+              <option value="manager">リーダー</option>
+            </select>
+          </div>
+          <div id="member-error" class="mb-4 text-red-600 text-sm hidden"></div>
+          <div class="flex justify-end space-x-2">
+            <button type="button" onclick="closeMemberModal()" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">キャンセル</button>
+            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+              <i class="fas fa-plus mr-2"></i>追加
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+    
+    <!-- Confirm Delete Modal -->
+    <div id="confirm-modal" class="modal">
+      <div class="modal-content p-6" style="max-width: 24rem;">
+        <h3 class="text-lg font-bold mb-4 text-red-600"><i class="fas fa-exclamation-triangle mr-2"></i>削除確認</h3>
+        <p id="confirm-message" class="text-gray-600 mb-4"></p>
+        <div class="flex justify-end space-x-2">
+          <button type="button" onclick="closeConfirmModal()" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">キャンセル</button>
+          <button type="button" id="confirm-delete-btn" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+            <i class="fas fa-trash mr-2"></i>削除
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Login Modal for Admin -->
+    <div id="login-modal" class="modal">
+      <div class="modal-content p-6" style="max-width: 24rem;">
+        <h3 class="text-lg font-bold mb-4"><i class="fas fa-sign-in-alt mr-2 text-blue-600"></i>ログイン</h3>
+        <p class="text-sm text-gray-600 mb-4">管理画面にアクセスするにはログインしてください。</p>
+        <form id="login-form">
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">ユーザーを選択</label>
+            <select id="login-user-select" class="w-full border rounded-lg px-3 py-2" required>
+              <option value="">選択してください...</option>
+            </select>
+          </div>
+          <div id="login-error" class="mb-4 text-red-600 text-sm hidden"></div>
+          <div class="flex justify-end space-x-2">
+            <a href="/" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">トップへ戻る</a>
+            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+              <i class="fas fa-sign-in-alt mr-2"></i>ログイン
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+  
+  const scripts = `
+    <script>
+      let allUsers = [];
+      let allTeams = [];
+      let organization = null;
+      let currentTab = 'users';
+      
+      const roleLabels = { participant: '参加者', manager: 'マネージャー', executive: '経営層' };
+      const roleColors = { participant: 'bg-gray-100 text-gray-700', manager: 'bg-blue-100 text-blue-700', executive: 'bg-purple-100 text-purple-700' };
+      
+      async function initAdmin() {
+        await loadCurrentUser();
+        
+        if (!window.currentUser) {
+          renderLoginRequired();
+          loadLoginUsers();
+          return;
+        }
+        
+        if (window.currentUser.role !== 'manager' && window.currentUser.role !== 'executive') {
+          renderAccessDenied();
+          return;
+        }
+        
+        await loadAdminData();
+        renderAdminPanel();
+      }
+      
+      function renderLoginRequired() {
+        document.getElementById('admin-content').innerHTML = \`
+          <div class="bg-white rounded-lg shadow-sm p-8 text-center">
+            <i class="fas fa-lock text-4xl text-gray-300 mb-4"></i>
+            <h2 class="text-xl font-semibold text-gray-700 mb-2">ログインが必要です</h2>
+            <p class="text-gray-500 mb-4">管理画面にアクセスするにはログインしてください</p>
+            <button onclick="openLoginModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+              <i class="fas fa-sign-in-alt mr-2"></i>ログイン
+            </button>
+          </div>
+        \`;
+      }
+      
+      function renderAccessDenied() {
+        document.getElementById('admin-content').innerHTML = \`
+          <div class="bg-white rounded-lg shadow-sm p-8 text-center">
+            <i class="fas fa-ban text-4xl text-red-300 mb-4"></i>
+            <h2 class="text-xl font-semibold text-gray-700 mb-2">アクセス権限がありません</h2>
+            <p class="text-gray-500 mb-4">管理画面にアクセスするにはマネージャー以上の権限が必要です</p>
+            <a href="/" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 inline-block">
+              <i class="fas fa-home mr-2"></i>トップへ戻る
+            </a>
+          </div>
+        \`;
+      }
+      
+      async function loadAdminData() {
+        const [orgRes, usersRes, teamsRes] = await Promise.all([
+          axios.get('/api/organizations'),
+          axios.get('/api/users'),
+          axios.get('/api/teams')
+        ]);
+        
+        organization = orgRes.data[0];
+        allUsers = usersRes.data;
+        allTeams = teamsRes.data;
+      }
+      
+      function renderAdminPanel() {
+        const html = \`
+          <div class="bg-white rounded-lg shadow-sm mb-6 p-4">
+            <div class="flex items-center justify-between">
+              <div>
+                <h2 class="text-lg font-semibold text-gray-800">
+                  <i class="fas fa-building mr-2 text-blue-600"></i>\${organization?.name || '組織名未設定'}
+                </h2>
+                <p class="text-sm text-gray-500">組織ID: \${organization?.id}</p>
+              </div>
+              <button onclick="editOrganization()" class="px-3 py-1 text-blue-600 hover:bg-blue-50 rounded">
+                <i class="fas fa-edit mr-1"></i>編集
+              </button>
+            </div>
+          </div>
+          
+          <!-- Tabs -->
+          <div class="border-b mb-4">
+            <div class="flex space-x-4">
+              <button onclick="switchTab('users')" class="admin-tab px-4 py-2 \${currentTab === 'users' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500 hover:text-gray-700'}" data-tab="users">
+                <i class="fas fa-user mr-1"></i>ユーザー (\${allUsers.length})
+              </button>
+              <button onclick="switchTab('teams')" class="admin-tab px-4 py-2 \${currentTab === 'teams' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500 hover:text-gray-700'}" data-tab="teams">
+                <i class="fas fa-users mr-1"></i>チーム (\${allTeams.length})
+              </button>
+            </div>
+          </div>
+          
+          <div id="tab-content"></div>
+        \`;
+        
+        document.getElementById('admin-content').innerHTML = html;
+        renderTabContent();
+      }
+      
+      function switchTab(tab) {
+        currentTab = tab;
+        document.querySelectorAll('.admin-tab').forEach(btn => {
+          if (btn.dataset.tab === tab) {
+            btn.classList.add('border-b-2', 'border-blue-600', 'text-blue-600');
+            btn.classList.remove('text-gray-500');
+          } else {
+            btn.classList.remove('border-b-2', 'border-blue-600', 'text-blue-600');
+            btn.classList.add('text-gray-500');
+          }
+        });
+        renderTabContent();
+      }
+      
+      function renderTabContent() {
+        if (currentTab === 'users') {
+          renderUsersTab();
+        } else {
+          renderTeamsTab();
+        }
+      }
+      
+      function renderUsersTab() {
+        const html = \`
+          <div class="flex justify-between items-center mb-4">
+            <input type="text" id="user-search" placeholder="ユーザーを検索..." class="border rounded-lg px-3 py-2 w-64" oninput="filterUsers()">
+            <button onclick="openUserModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+              <i class="fas fa-plus mr-2"></i>ユーザー追加
+            </button>
+          </div>
+          
+          <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+            <table class="w-full">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">名前</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">メールアドレス</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">権限</th>
+                  <th class="px-4 py-3 text-right text-sm font-medium text-gray-600">操作</th>
+                </tr>
+              </thead>
+              <tbody id="users-table-body">
+                \${allUsers.map(u => \`
+                  <tr class="border-t user-row" data-name="\${u.name.toLowerCase()}" data-email="\${u.email.toLowerCase()}">
+                    <td class="px-4 py-3">
+                      <div class="font-medium text-gray-800">\${u.name}</div>
+                    </td>
+                    <td class="px-4 py-3 text-gray-600">\${u.email}</td>
+                    <td class="px-4 py-3">
+                      <span class="px-2 py-1 rounded-full text-xs font-medium \${roleColors[u.role]}">\${roleLabels[u.role]}</span>
+                    </td>
+                    <td class="px-4 py-3 text-right">
+                      <button onclick="editUser(\${u.id})" class="text-blue-600 hover:text-blue-800 mr-2">
+                        <i class="fas fa-edit"></i>
+                      </button>
+                      <button onclick="confirmDeleteUser(\${u.id}, '\${u.name}')" class="text-red-600 hover:text-red-800">
+                        <i class="fas fa-trash"></i>
+                      </button>
+                    </td>
+                  </tr>
+                \`).join('')}
+              </tbody>
+            </table>
+          </div>
+        \`;
+        
+        document.getElementById('tab-content').innerHTML = html;
+      }
+      
+      function renderTeamsTab() {
+        const html = \`
+          <div class="flex justify-end mb-4">
+            <button onclick="openTeamModal()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+              <i class="fas fa-plus mr-2"></i>チーム追加
+            </button>
+          </div>
+          
+          <div class="grid gap-4 md:grid-cols-2">
+            \${allTeams.map(t => \`
+              <div class="bg-white rounded-lg shadow-sm p-4" id="team-card-\${t.id}">
+                <div class="flex items-center justify-between mb-3">
+                  <h3 class="font-semibold text-gray-800">
+                    <i class="fas fa-users mr-2 text-green-600"></i>\${t.name}
+                  </h3>
+                  <div>
+                    <button onclick="editTeam(\${t.id}, '\${t.name}')" class="text-blue-600 hover:text-blue-800 mr-2">
+                      <i class="fas fa-edit"></i>
+                    </button>
+                    <button onclick="confirmDeleteTeam(\${t.id}, '\${t.name}')" class="text-red-600 hover:text-red-800">
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </div>
+                </div>
+                <div id="team-members-\${t.id}" class="text-sm text-gray-500">読み込み中...</div>
+                <button onclick="openMemberModal(\${t.id})" class="mt-3 text-blue-600 text-sm hover:underline">
+                  <i class="fas fa-user-plus mr-1"></i>メンバー追加
+                </button>
+              </div>
+            \`).join('')}
+          </div>
+        \`;
+        
+        document.getElementById('tab-content').innerHTML = html;
+        
+        // Load team members
+        allTeams.forEach(t => loadTeamMembers(t.id));
+      }
+      
+      async function loadTeamMembers(teamId) {
+        try {
+          const res = await axios.get(\`/api/teams/\${teamId}\`);
+          const members = res.data.members || [];
+          
+          const memberHtml = members.length > 0 
+            ? members.map(m => \`
+                <div class="flex items-center justify-between py-1">
+                  <span>\${m.name} <span class="text-xs text-gray-400">(\${m.team_role === 'manager' ? 'リーダー' : 'メンバー'})</span></span>
+                  <button onclick="removeMember(\${teamId}, \${m.id})" class="text-red-400 hover:text-red-600 text-xs">
+                    <i class="fas fa-times"></i>
+                  </button>
+                </div>
+              \`).join('')
+            : '<span class="text-gray-400">メンバーなし</span>';
+          
+          document.getElementById(\`team-members-\${teamId}\`).innerHTML = memberHtml;
+        } catch (err) {
+          console.error(err);
+        }
+      }
+      
+      function filterUsers() {
+        const search = document.getElementById('user-search').value.toLowerCase();
+        document.querySelectorAll('.user-row').forEach(row => {
+          const name = row.dataset.name;
+          const email = row.dataset.email;
+          row.style.display = (name.includes(search) || email.includes(search)) ? '' : 'none';
+        });
+      }
+      
+      // User Modal
+      function openUserModal(userId = null) {
+        document.getElementById('user-id').value = userId || '';
+        document.getElementById('user-name').value = '';
+        document.getElementById('user-email').value = '';
+        document.getElementById('user-role').value = 'participant';
+        document.getElementById('user-error').classList.add('hidden');
+        document.getElementById('user-modal-title').innerHTML = userId 
+          ? '<i class="fas fa-user-edit mr-2 text-blue-600"></i>ユーザー編集'
+          : '<i class="fas fa-user-plus mr-2 text-blue-600"></i>ユーザー追加';
+        document.getElementById('user-modal').classList.add('active');
+      }
+      
+      function closeUserModal() {
+        document.getElementById('user-modal').classList.remove('active');
+      }
+      
+      async function editUser(userId) {
+        const user = allUsers.find(u => u.id === userId);
+        if (!user) return;
+        
+        document.getElementById('user-id').value = user.id;
+        document.getElementById('user-name').value = user.name;
+        document.getElementById('user-email').value = user.email;
+        document.getElementById('user-role').value = user.role;
+        document.getElementById('user-error').classList.add('hidden');
+        document.getElementById('user-modal-title').innerHTML = '<i class="fas fa-user-edit mr-2 text-blue-600"></i>ユーザー編集';
+        document.getElementById('user-modal').classList.add('active');
+      }
+      
+      document.getElementById('user-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const errorDiv = document.getElementById('user-error');
+        
+        const userId = document.getElementById('user-id').value;
+        const data = {
+          name: document.getElementById('user-name').value,
+          email: document.getElementById('user-email').value,
+          role: document.getElementById('user-role').value,
+          organization_id: organization.id
+        };
+        
+        try {
+          if (userId) {
+            await axios.put(\`/api/users/\${userId}\`, data);
+          } else {
+            await axios.post('/api/users', data);
+          }
+          closeUserModal();
+          await loadAdminData();
+          renderAdminPanel();
+        } catch (err) {
+          errorDiv.textContent = err.response?.data?.error || 'エラーが発生しました';
+          errorDiv.classList.remove('hidden');
+        }
+      });
+      
+      // Team Modal
+      function openTeamModal(teamId = null, teamName = '') {
+        document.getElementById('team-id').value = teamId || '';
+        document.getElementById('team-name').value = teamName;
+        document.getElementById('team-error').classList.add('hidden');
+        document.getElementById('team-modal-title').innerHTML = teamId 
+          ? '<i class="fas fa-edit mr-2 text-green-600"></i>チーム編集'
+          : '<i class="fas fa-users mr-2 text-green-600"></i>チーム追加';
+        document.getElementById('team-modal').classList.add('active');
+      }
+      
+      function closeTeamModal() {
+        document.getElementById('team-modal').classList.remove('active');
+      }
+      
+      function editTeam(teamId, teamName) {
+        openTeamModal(teamId, teamName);
+      }
+      
+      document.getElementById('team-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const errorDiv = document.getElementById('team-error');
+        
+        const teamId = document.getElementById('team-id').value;
+        const data = {
+          name: document.getElementById('team-name').value,
+          organization_id: organization.id
+        };
+        
+        try {
+          if (teamId) {
+            await axios.put(\`/api/teams/\${teamId}\`, data);
+          } else {
+            await axios.post('/api/teams', data);
+          }
+          closeTeamModal();
+          await loadAdminData();
+          renderAdminPanel();
+        } catch (err) {
+          errorDiv.textContent = err.response?.data?.error || 'エラーが発生しました';
+          errorDiv.classList.remove('hidden');
+        }
+      });
+      
+      // Member Modal
+      function openMemberModal(teamId) {
+        document.getElementById('member-team-id').value = teamId;
+        document.getElementById('member-user-id').innerHTML = '<option value="">選択してください...</option>' + 
+          allUsers.map(u => \`<option value="\${u.id}">\${u.name} (\${u.email})</option>\`).join('');
+        document.getElementById('member-role').value = 'participant';
+        document.getElementById('member-error').classList.add('hidden');
+        document.getElementById('member-modal').classList.add('active');
+      }
+      
+      function closeMemberModal() {
+        document.getElementById('member-modal').classList.remove('active');
+      }
+      
+      document.getElementById('member-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const errorDiv = document.getElementById('member-error');
+        
+        const teamId = document.getElementById('member-team-id').value;
+        const data = {
+          user_id: parseInt(document.getElementById('member-user-id').value),
+          role: document.getElementById('member-role').value
+        };
+        
+        try {
+          await axios.post(\`/api/teams/\${teamId}/members\`, data);
+          closeMemberModal();
+          loadTeamMembers(teamId);
+        } catch (err) {
+          errorDiv.textContent = err.response?.data?.error || 'エラーが発生しました';
+          errorDiv.classList.remove('hidden');
+        }
+      });
+      
+      async function removeMember(teamId, userId) {
+        if (!confirm('このメンバーをチームから削除しますか？')) return;
+        
+        try {
+          await axios.delete(\`/api/teams/\${teamId}/members/\${userId}\`);
+          loadTeamMembers(teamId);
+        } catch (err) {
+          alert(err.response?.data?.error || 'エラーが発生しました');
+        }
+      }
+      
+      // Confirm Modal
+      let deleteCallback = null;
+      
+      function confirmDeleteUser(userId, userName) {
+        document.getElementById('confirm-message').textContent = \`ユーザー「\${userName}」を削除しますか？この操作は取り消せません。\`;
+        deleteCallback = async () => {
+          try {
+            await axios.delete(\`/api/users/\${userId}\`);
+            closeConfirmModal();
+            await loadAdminData();
+            renderAdminPanel();
+          } catch (err) {
+            alert(err.response?.data?.error || 'エラーが発生しました');
+          }
+        };
+        document.getElementById('confirm-modal').classList.add('active');
+      }
+      
+      function confirmDeleteTeam(teamId, teamName) {
+        document.getElementById('confirm-message').textContent = \`チーム「\${teamName}」を削除しますか？この操作は取り消せません。\`;
+        deleteCallback = async () => {
+          try {
+            await axios.delete(\`/api/teams/\${teamId}\`);
+            closeConfirmModal();
+            await loadAdminData();
+            renderAdminPanel();
+          } catch (err) {
+            alert(err.response?.data?.error || 'エラーが発生しました');
+          }
+        };
+        document.getElementById('confirm-modal').classList.add('active');
+      }
+      
+      function closeConfirmModal() {
+        document.getElementById('confirm-modal').classList.remove('active');
+        deleteCallback = null;
+      }
+      
+      document.getElementById('confirm-delete-btn').addEventListener('click', () => {
+        if (deleteCallback) deleteCallback();
+      });
+      
+      // Organization Edit
+      async function editOrganization() {
+        const newName = prompt('組織名を入力してください', organization?.name || '');
+        if (!newName || newName === organization?.name) return;
+        
+        try {
+          await axios.put(\`/api/organizations/\${organization.id}\`, { name: newName });
+          await loadAdminData();
+          renderAdminPanel();
+        } catch (err) {
+          alert(err.response?.data?.error || 'エラーが発生しました');
+        }
+      }
+      
+      // Login functions
+      async function loadLoginUsers() {
+        try {
+          const res = await axios.get('/api/users');
+          const select = document.getElementById('login-user-select');
+          const roleIcons = { participant: '👤', manager: '👔', executive: '👑' };
+          
+          select.innerHTML = '<option value="">選択してください...</option>';
+          res.data.forEach(u => {
+            if (u.role === 'manager' || u.role === 'executive') {
+              select.innerHTML += \`<option value="\${u.email}">\${roleIcons[u.role]} \${u.name} (\${roleLabels[u.role]})</option>\`;
+            }
+          });
+        } catch (err) {
+          console.error('Failed to load users:', err);
+        }
+      }
+      
+      document.getElementById('login-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('login-user-select').value;
+        const errorDiv = document.getElementById('login-error');
+        
+        if (!email) {
+          errorDiv.textContent = 'ユーザーを選択してください';
+          errorDiv.classList.remove('hidden');
+          return;
+        }
+        
+        try {
+          await axios.post('/api/auth/login', { email });
+          closeLoginModal();
+          window.location.reload();
+        } catch (err) {
+          errorDiv.textContent = err.response?.data?.error || 'ログインに失敗しました';
+          errorDiv.classList.remove('hidden');
+        }
+      });
+      
+      // Initialize
+      initAdmin();
+    </script>
+  `;
+  
+  return c.html(renderPage('管理設定', content, scripts));
 });
 
 export default app;
