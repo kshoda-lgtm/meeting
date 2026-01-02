@@ -633,15 +633,32 @@ app.get('/', (c) => {
         event.preventDefault();
         event.stopPropagation();
         
-        if (!confirm(\`会議「\${title}」を削除しますか？\\n\\nこの操作は取り消せません。会議に関連するすべてのデータ（議題、決定事項、アクション、Issue等）も削除されます。\`)) {
+        if (!confirm(\`会議「\${title}」を削除しますか？\\n\\nこの操作は取り消せません。\`)) {
           return;
+        }
+        
+        // 即座にUIから削除（楽観的更新）
+        const card = event.target.closest('.meeting-card');
+        if (card) {
+          card.style.opacity = '0.5';
+          card.style.pointerEvents = 'none';
         }
         
         try {
           await axios.delete(\`/api/meetings/\${meetingId}\`);
-          alert('会議を削除しました');
-          loadMeetings();
+          // 成功したらカードをアニメーションで消す
+          if (card) {
+            card.style.transition = 'all 0.3s ease';
+            card.style.transform = 'scale(0.9)';
+            card.style.opacity = '0';
+            setTimeout(() => card.remove(), 300);
+          }
         } catch (err) {
+          // 失敗したら元に戻す
+          if (card) {
+            card.style.opacity = '1';
+            card.style.pointerEvents = 'auto';
+          }
           alert(err.response?.data?.error || '会議の削除に失敗しました');
         }
       }
