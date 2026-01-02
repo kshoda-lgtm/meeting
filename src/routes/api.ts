@@ -51,18 +51,47 @@ function hasRoleAccess(userRole: UserRole, requiredRole: UserRole): boolean {
   return hierarchy[userRole] >= hierarchy[requiredRole];
 }
 
+// Simple password hash function (for demo - use bcrypt in production)
+async function hashPassword(password: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password + 'vexum_salt_2024');
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function verifyPassword(password: string, hash: string): Promise<boolean> {
+  const inputHash = await hashPassword(password);
+  return inputHash === hash;
+}
+
 // ==================== Auth Endpoints ====================
-// Login (simple email-based for demo)
+// Login with email and password
 api.post('/auth/login', async (c) => {
   const body = await c.req.json();
-  const { email } = body;
+  const { email, password } = body;
+  
+  if (!email || !password) {
+    return c.json({ error: 'メールアドレスとパスワードを入力してください' }, 400);
+  }
   
   const user = await c.env.DB.prepare(
     'SELECT * FROM users WHERE email = ?'
-  ).bind(email).first();
+  ).bind(email).first() as any;
   
   if (!user) {
-    return c.json({ error: 'ユーザーが見つかりません' }, 401);
+    return c.json({ error: 'メールアドレスまたはパスワードが正しくありません' }, 401);
+  }
+  
+  // Check if user has password set
+  if (!user.password_hash) {
+    return c.json({ error: 'パスワードが設定されていません。管理者に連絡してください。' }, 401);
+  }
+  
+  // Verify password
+  const isValid = await verifyPassword(password, user.password_hash);
+  if (!isValid) {
+    return c.json({ error: 'メールアドレスまたはパスワードが正しくありません' }, 401);
   }
   
   // Create session
@@ -77,7 +106,7 @@ api.post('/auth/login', async (c) => {
   setCookie(c, 'session_token', token, {
     path: '/',
     httpOnly: true,
-    secure: false, // Set to true in production with HTTPS
+    secure: true,
     maxAge: 7 * 24 * 60 * 60,
     sameSite: 'Lax'
   });
@@ -91,6 +120,72 @@ api.post('/auth/login', async (c) => {
       organization_id: user.organization_id
     }
   });
+});
+
+// Set password for user (admin only or first-time setup)
+api.post('/auth/set-password', async (c) => {
+  const body = await c.req.json();
+  const { user_id, password, admin_key } = body;
+  
+  // Allow setting password with admin key or for logged-in admin
+  const currentUser = await getCurrentUser(c);
+  
+  // Check if this is admin setting password for another user
+  const isAdmin = currentUser && hasRoleAccess(currentUser.role, 'manager');
+  // Or if this is initial setup with admin key
+  const isInitialSetup = admin_key === 'vexum_initial_setup_2024';
+  
+  if (!isAdmin && !isInitialSetup) {
+    return c.json({ error: '権限がありません' }, 403);
+  }
+  
+  if (!password || password.length < 4) {
+    return c.json({ error: 'パスワードは4文字以上で入力してください' }, 400);
+  }
+  
+  const passwordHash = await hashPassword(password);
+  
+  await c.env.DB.prepare(
+    'UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+  ).bind(passwordHash, user_id).run();
+  
+  return c.json({ success: true });
+});
+
+// Change own password
+api.post('/auth/change-password', async (c) => {
+  const user = await getCurrentUser(c);
+  if (!user) {
+    return c.json({ error: 'ログインが必要です' }, 401);
+  }
+  
+  const body = await c.req.json();
+  const { current_password, new_password } = body;
+  
+  // Get user with password hash
+  const userWithHash = await c.env.DB.prepare(
+    'SELECT password_hash FROM users WHERE id = ?'
+  ).bind(user.id).first() as any;
+  
+  // Verify current password if set
+  if (userWithHash?.password_hash) {
+    const isValid = await verifyPassword(current_password, userWithHash.password_hash);
+    if (!isValid) {
+      return c.json({ error: '現在のパスワードが正しくありません' }, 401);
+    }
+  }
+  
+  if (!new_password || new_password.length < 4) {
+    return c.json({ error: '新しいパスワードは4文字以上で入力してください' }, 400);
+  }
+  
+  const passwordHash = await hashPassword(new_password);
+  
+  await c.env.DB.prepare(
+    'UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+  ).bind(passwordHash, user.id).run();
+  
+  return c.json({ success: true });
 });
 
 api.post('/auth/logout', async (c) => {
@@ -197,7 +292,7 @@ api.post('/users', async (c) => {
   }
   
   const body = await c.req.json();
-  const { name, email, role, organization_id } = body;
+  const { name, email, role, organization_id, password } = body;
   
   // Check if email already exists
   const existing = await c.env.DB.prepare(
@@ -208,9 +303,15 @@ api.post('/users', async (c) => {
     return c.json({ error: 'このメールアドレスは既に登録されています' }, 400);
   }
   
+  // Hash password if provided
+  let passwordHash = null;
+  if (password && password.length >= 4) {
+    passwordHash = await hashPassword(password);
+  }
+  
   const result = await c.env.DB.prepare(
-    'INSERT INTO users (organization_id, email, name, role) VALUES (?, ?, ?, ?) RETURNING *'
-  ).bind(organization_id, email, name, role || 'participant').first();
+    'INSERT INTO users (organization_id, email, name, role, password_hash) VALUES (?, ?, ?, ?, ?) RETURNING id, organization_id, email, name, role, created_at, updated_at'
+  ).bind(organization_id, email, name, role || 'participant', passwordHash).first();
   
   return c.json(result, 201);
 });
@@ -691,6 +792,45 @@ api.patch('/meetings/:id', async (c) => {
   ).bind(...params).first();
   
   return c.json(result);
+});
+
+// Delete meeting
+api.delete('/meetings/:id', async (c) => {
+  const user = await getCurrentUser(c);
+  if (!user || !hasRoleAccess(user.role, 'manager')) {
+    return c.json({ error: '会議を削除する権限がありません' }, 403);
+  }
+  
+  const id = c.req.param('id');
+  
+  // Check if meeting exists
+  const meeting = await c.env.DB.prepare('SELECT * FROM meetings WHERE id = ?').bind(id).first();
+  if (!meeting) {
+    return c.json({ error: '会議が見つかりません' }, 404);
+  }
+  
+  // Delete related data first (cascade delete)
+  await c.env.DB.prepare('DELETE FROM broadcast_consumptions WHERE meeting_id = ?').bind(id).run();
+  await c.env.DB.prepare('DELETE FROM broadcasts WHERE meeting_id = ?').bind(id).run();
+  await c.env.DB.prepare('DELETE FROM proposal_seeds WHERE meeting_id = ?').bind(id).run();
+  await c.env.DB.prepare('DELETE FROM client_weekly_summaries WHERE meeting_id = ?').bind(id).run();
+  await c.env.DB.prepare('DELETE FROM initiatives WHERE meeting_id = ?').bind(id).run();
+  await c.env.DB.prepare('DELETE FROM check_ins WHERE meeting_id = ?').bind(id).run();
+  await c.env.DB.prepare('DELETE FROM links WHERE meeting_id = ?').bind(id).run();
+  await c.env.DB.prepare('DELETE FROM issues WHERE meeting_id = ?').bind(id).run();
+  await c.env.DB.prepare('DELETE FROM actions WHERE meeting_id = ?').bind(id).run();
+  await c.env.DB.prepare('DELETE FROM decisions WHERE meeting_id = ?').bind(id).run();
+  await c.env.DB.prepare('DELETE FROM agenda_items WHERE meeting_id = ?').bind(id).run();
+  await c.env.DB.prepare('DELETE FROM meeting_participants WHERE meeting_id = ?').bind(id).run();
+  await c.env.DB.prepare('DELETE FROM strategy_priorities WHERE meeting_id = ?').bind(id).run();
+  await c.env.DB.prepare('DELETE FROM strategy_not_doing WHERE meeting_id = ?').bind(id).run();
+  await c.env.DB.prepare('DELETE FROM strategy_allocations WHERE meeting_id = ?').bind(id).run();
+  await c.env.DB.prepare('DELETE FROM rule_updates WHERE meeting_id = ?').bind(id).run();
+  
+  // Delete the meeting itself
+  await c.env.DB.prepare('DELETE FROM meetings WHERE id = ?').bind(id).run();
+  
+  return c.json({ success: true, message: '会議を削除しました' });
 });
 
 // ==================== Agenda Items ====================

@@ -243,13 +243,12 @@ app.get('/', (c) => {
         <p class="text-sm text-gray-600 mb-4">会議システムにログインしてください。</p>
         <form id="login-form">
           <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700 mb-2">ユーザーを選択</label>
-            <select id="login-user-select" class="w-full border rounded-lg px-3 py-2" required>
-              <option value="">選択してください...</option>
-            </select>
+            <label class="block text-sm font-medium text-gray-700 mb-2">メールアドレス</label>
+            <input type="email" id="login-email" class="w-full border rounded-lg px-3 py-2" placeholder="email@example.com" required>
           </div>
-          <div id="login-user-info" class="mb-4 p-3 bg-gray-50 rounded-lg hidden">
-            <div class="text-sm text-gray-600" id="login-user-details"></div>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">パスワード</label>
+            <input type="password" id="login-password" class="w-full border rounded-lg px-3 py-2" placeholder="パスワードを入力" required>
           </div>
           <div id="login-error" class="mb-4 text-red-600 text-sm hidden"></div>
           <div class="flex justify-end space-x-2">
@@ -484,22 +483,31 @@ app.get('/', (c) => {
           completed: '<span class="status-badge bg-blue-100 text-blue-600">完了</span>'
         };
         
+        const canDelete = window.currentUser && (window.currentUser.role === 'manager' || window.currentUser.role === 'executive');
+        
         const html = filtered.map(m => \`
-          <a href="/meeting/\${m.id}" class="meeting-card block bg-white rounded-lg shadow-sm border-l-4 \${typeColors[m.meeting_type_slug]} p-4 transition-all duration-200 hover:shadow-md">
-            <div class="flex items-start justify-between mb-2">
-              <div class="flex items-center space-x-2">
-                <i class="fas \${typeIcons[m.meeting_type_slug]} text-gray-400"></i>
-                <span class="text-sm text-gray-500">\${m.meeting_type_name}</span>
+          <div class="meeting-card bg-white rounded-lg shadow-sm border-l-4 \${typeColors[m.meeting_type_slug]} p-4 transition-all duration-200 hover:shadow-md relative">
+            <a href="/meeting/\${m.id}" class="block">
+              <div class="flex items-start justify-between mb-2">
+                <div class="flex items-center space-x-2">
+                  <i class="fas \${typeIcons[m.meeting_type_slug]} text-gray-400"></i>
+                  <span class="text-sm text-gray-500">\${m.meeting_type_name}</span>
+                </div>
+                \${statusBadges[m.status]}
               </div>
-              \${statusBadges[m.status]}
-            </div>
-            <h3 class="font-semibold text-gray-800 mb-1">\${m.title}</h3>
-            <div class="text-sm text-gray-500">
-              <i class="far fa-calendar-alt mr-1"></i>
-              \${dayjs(m.scheduled_at).format('M月D日(ddd) HH:mm')}
-            </div>
-            \${m.team_name ? \`<div class="text-sm text-gray-500 mt-1"><i class="fas fa-users mr-1"></i>\${m.team_name}</div>\` : ''}
-          </a>
+              <h3 class="font-semibold text-gray-800 mb-1">\${m.title}</h3>
+              <div class="text-sm text-gray-500">
+                <i class="far fa-calendar-alt mr-1"></i>
+                \${dayjs(m.scheduled_at).format('M月D日(ddd) HH:mm')}
+              </div>
+              \${m.team_name ? \`<div class="text-sm text-gray-500 mt-1"><i class="fas fa-users mr-1"></i>\${m.team_name}</div>\` : ''}
+            </a>
+            \${canDelete ? \`
+              <button onclick="deleteMeeting(\${m.id}, '\${m.title.replace(/'/g, "\\\\'")}', event)" class="absolute top-2 right-2 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors" title="会議を削除">
+                <i class="fas fa-trash-alt"></i>
+              </button>
+            \` : ''}
+          </div>
         \`).join('');
         
         document.getElementById('meeting-list').innerHTML = html;
@@ -620,60 +628,39 @@ app.get('/', (c) => {
         }
       });
       
-      // Login functionality
-      async function loadLoginUsers() {
+      // Delete meeting function
+      async function deleteMeeting(meetingId, title, event) {
+        event.preventDefault();
+        event.stopPropagation();
+        
+        if (!confirm(\`会議「\${title}」を削除しますか？\\n\\nこの操作は取り消せません。会議に関連するすべてのデータ（議題、決定事項、アクション、Issue等）も削除されます。\`)) {
+          return;
+        }
+        
         try {
-          const res = await axios.get('/api/users');
-          const select = document.getElementById('login-user-select');
-          const roleLabels = { participant: '参加者', manager: 'マネージャー', executive: '経営層' };
-          const roleIcons = { participant: '👤', manager: '👔', executive: '👑' };
-          
-          select.innerHTML = '<option value="">選択してください...</option>';
-          res.data.forEach(u => {
-            select.innerHTML += \`<option value="\${u.email}" data-role="\${u.role}">\${roleIcons[u.role]} \${u.name} (\${roleLabels[u.role]})</option>\`;
-          });
+          await axios.delete(\`/api/meetings/\${meetingId}\`);
+          alert('会議を削除しました');
+          loadMeetings();
         } catch (err) {
-          console.error('Failed to load users:', err);
+          alert(err.response?.data?.error || '会議の削除に失敗しました');
         }
       }
       
-      document.getElementById('login-user-select').addEventListener('change', function() {
-        const infoDiv = document.getElementById('login-user-info');
-        const detailsDiv = document.getElementById('login-user-details');
-        
-        if (this.value) {
-          const option = this.options[this.selectedIndex];
-          const role = option.dataset.role;
-          const roleLabels = { participant: '参加者', manager: 'マネージャー', executive: '経営層' };
-          const accessInfo = {
-            participant: 'チームMTG、全体会議を閲覧できます',
-            manager: 'チームMTG、本部会議、全体会議を管理できます',
-            executive: 'すべての会議を管理できます（戦略会議含む）'
-          };
-          
-          detailsDiv.innerHTML = \`
-            <div class="font-medium text-gray-800 mb-1">権限: \${roleLabels[role]}</div>
-            <div class="text-xs text-gray-500">\${accessInfo[role]}</div>
-          \`;
-          infoDiv.classList.remove('hidden');
-        } else {
-          infoDiv.classList.add('hidden');
-        }
-      });
-      
+      // Login functionality with password
       document.getElementById('login-form').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const email = document.getElementById('login-user-select').value;
+        const email = document.getElementById('login-email').value;
+        const password = document.getElementById('login-password').value;
         const errorDiv = document.getElementById('login-error');
         
-        if (!email) {
-          errorDiv.textContent = 'ユーザーを選択してください';
+        if (!email || !password) {
+          errorDiv.textContent = 'メールアドレスとパスワードを入力してください';
           errorDiv.classList.remove('hidden');
           return;
         }
         
         try {
-          const res = await axios.post('/api/auth/login', { email });
+          const res = await axios.post('/api/auth/login', { email, password });
           window.currentUser = res.data.user;
           closeLoginModal();
           
@@ -874,13 +861,12 @@ app.get('/meeting/:id', async (c) => {
         <p class="text-sm text-gray-600 mb-4">会議室にアクセスするにはログインしてください。</p>
         <form id="login-form">
           <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700 mb-2">ユーザーを選択</label>
-            <select id="login-user-select" class="w-full border rounded-lg px-3 py-2" required>
-              <option value="">選択してください...</option>
-            </select>
+            <label class="block text-sm font-medium text-gray-700 mb-2">メールアドレス</label>
+            <input type="email" id="login-email" class="w-full border rounded-lg px-3 py-2" placeholder="email@example.com" required>
           </div>
-          <div id="login-user-info" class="mb-4 p-3 bg-gray-50 rounded-lg hidden">
-            <div class="text-sm text-gray-600" id="login-user-details"></div>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">パスワード</label>
+            <input type="password" id="login-password" class="w-full border rounded-lg px-3 py-2" placeholder="パスワードを入力" required>
           </div>
           <div id="login-error" class="mb-4 text-red-600 text-sm hidden"></div>
           <div class="flex justify-end space-x-2">
@@ -896,60 +882,21 @@ app.get('/meeting/:id', async (c) => {
   
   const scripts = `
     <script>
-      // Login functionality for meeting room
-      async function loadLoginUsers() {
-        try {
-          const res = await axios.get('/api/users');
-          const select = document.getElementById('login-user-select');
-          const roleLabels = { participant: '参加者', manager: 'マネージャー', executive: '経営層' };
-          const roleIcons = { participant: '👤', manager: '👔', executive: '👑' };
-          
-          select.innerHTML = '<option value="">選択してください...</option>';
-          res.data.forEach(u => {
-            select.innerHTML += \`<option value="\${u.email}" data-role="\${u.role}">\${roleIcons[u.role]} \${u.name} (\${roleLabels[u.role]})</option>\`;
-          });
-        } catch (err) {
-          console.error('Failed to load users:', err);
-        }
-      }
-      
-      document.getElementById('login-user-select').addEventListener('change', function() {
-        const infoDiv = document.getElementById('login-user-info');
-        const detailsDiv = document.getElementById('login-user-details');
-        
-        if (this.value) {
-          const option = this.options[this.selectedIndex];
-          const role = option.dataset.role;
-          const roleLabels = { participant: '参加者', manager: 'マネージャー', executive: '経営層' };
-          const accessInfo = {
-            participant: 'チームMTG、全体会議を閲覧できます',
-            manager: 'チームMTG、本部会議、全体会議を管理できます',
-            executive: 'すべての会議を管理できます（戦略会議含む）'
-          };
-          
-          detailsDiv.innerHTML = \`
-            <div class="font-medium text-gray-800 mb-1">権限: \${roleLabels[role]}</div>
-            <div class="text-xs text-gray-500">\${accessInfo[role]}</div>
-          \`;
-          infoDiv.classList.remove('hidden');
-        } else {
-          infoDiv.classList.add('hidden');
-        }
-      });
-      
+      // Login functionality for meeting room with password
       document.getElementById('login-form').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const email = document.getElementById('login-user-select').value;
+        const email = document.getElementById('login-email').value;
+        const password = document.getElementById('login-password').value;
         const errorDiv = document.getElementById('login-error');
         
-        if (!email) {
-          errorDiv.textContent = 'ユーザーを選択してください';
+        if (!email || !password) {
+          errorDiv.textContent = 'メールアドレスとパスワードを入力してください';
           errorDiv.classList.remove('hidden');
           return;
         }
         
         try {
-          const res = await axios.post('/api/auth/login', { email });
+          const res = await axios.post('/api/auth/login', { email, password });
           window.currentUser = res.data.user;
           closeLoginModal();
           
@@ -960,8 +907,6 @@ app.get('/meeting/:id', async (c) => {
           errorDiv.classList.remove('hidden');
         }
       });
-      
-      loadLoginUsers();
     </script>
     <script src="/static/meeting-room.js"></script>
   `;
@@ -1378,6 +1323,11 @@ app.get('/admin', (c) => {
             <input type="email" id="user-email" class="w-full border rounded-lg px-3 py-2" required>
           </div>
           <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">パスワード <span id="password-required" class="text-red-500">*</span></label>
+            <input type="password" id="user-password" class="w-full border rounded-lg px-3 py-2" placeholder="4文字以上">
+            <p id="password-hint" class="text-xs text-gray-500 mt-1">編集時は空欄のままで変更なし</p>
+          </div>
+          <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-2">権限 <span class="text-red-500">*</span></label>
             <select id="user-role" class="w-full border rounded-lg px-3 py-2" required>
               <option value="participant">参加者（チームMTG・全体会議のみ）</option>
@@ -1468,10 +1418,12 @@ app.get('/admin', (c) => {
         <p class="text-sm text-gray-600 mb-4">管理画面にアクセスするにはログインしてください。</p>
         <form id="login-form">
           <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700 mb-2">ユーザーを選択</label>
-            <select id="login-user-select" class="w-full border rounded-lg px-3 py-2" required>
-              <option value="">選択してください...</option>
-            </select>
+            <label class="block text-sm font-medium text-gray-700 mb-2">メールアドレス</label>
+            <input type="email" id="login-email" class="w-full border rounded-lg px-3 py-2" placeholder="email@example.com" required>
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">パスワード</label>
+            <input type="password" id="login-password" class="w-full border rounded-lg px-3 py-2" placeholder="パスワードを入力" required>
           </div>
           <div id="login-error" class="mb-4 text-red-600 text-sm hidden"></div>
           <div class="flex justify-end space-x-2">
@@ -1730,8 +1682,16 @@ app.get('/admin', (c) => {
         document.getElementById('user-id').value = userId || '';
         document.getElementById('user-name').value = '';
         document.getElementById('user-email').value = '';
+        document.getElementById('user-password').value = '';
         document.getElementById('user-role').value = 'participant';
         document.getElementById('user-error').classList.add('hidden');
+        
+        // Show/hide password required indicator
+        const isEdit = !!userId;
+        document.getElementById('password-required').style.display = isEdit ? 'none' : 'inline';
+        document.getElementById('password-hint').style.display = isEdit ? 'block' : 'none';
+        document.getElementById('user-password').required = !isEdit;
+        
         document.getElementById('user-modal-title').innerHTML = userId 
           ? '<i class="fas fa-user-edit mr-2 text-blue-600"></i>ユーザー編集'
           : '<i class="fas fa-user-plus mr-2 text-blue-600"></i>ユーザー追加';
@@ -1749,8 +1709,15 @@ app.get('/admin', (c) => {
         document.getElementById('user-id').value = user.id;
         document.getElementById('user-name').value = user.name;
         document.getElementById('user-email').value = user.email;
+        document.getElementById('user-password').value = '';
         document.getElementById('user-role').value = user.role;
         document.getElementById('user-error').classList.add('hidden');
+        
+        // Edit mode: password is optional
+        document.getElementById('password-required').style.display = 'none';
+        document.getElementById('password-hint').style.display = 'block';
+        document.getElementById('user-password').required = false;
+        
         document.getElementById('user-modal-title').innerHTML = '<i class="fas fa-user-edit mr-2 text-blue-600"></i>ユーザー編集';
         document.getElementById('user-modal').classList.add('active');
       }
@@ -1760,6 +1727,15 @@ app.get('/admin', (c) => {
         const errorDiv = document.getElementById('user-error');
         
         const userId = document.getElementById('user-id').value;
+        const password = document.getElementById('user-password').value;
+        
+        // Validate password for new users
+        if (!userId && (!password || password.length < 4)) {
+          errorDiv.textContent = '新規ユーザーにはパスワード（4文字以上）が必要です';
+          errorDiv.classList.remove('hidden');
+          return;
+        }
+        
         const data = {
           name: document.getElementById('user-name').value,
           email: document.getElementById('user-email').value,
@@ -1767,9 +1743,18 @@ app.get('/admin', (c) => {
           organization_id: organization.id
         };
         
+        // Include password if provided
+        if (password && password.length >= 4) {
+          data.password = password;
+        }
+        
         try {
           if (userId) {
             await axios.put(\`/api/users/\${userId}\`, data);
+            // If password was provided, set it separately
+            if (password && password.length >= 4) {
+              await axios.post('/api/auth/set-password', { user_id: parseInt(userId), password });
+            }
           } else {
             await axios.post('/api/users', data);
           }
@@ -1927,37 +1912,21 @@ app.get('/admin', (c) => {
         }
       }
       
-      // Login functions
-      async function loadLoginUsers() {
-        try {
-          const res = await axios.get('/api/users');
-          const select = document.getElementById('login-user-select');
-          const roleIcons = { participant: '👤', manager: '👔', executive: '👑' };
-          
-          select.innerHTML = '<option value="">選択してください...</option>';
-          res.data.forEach(u => {
-            if (u.role === 'manager' || u.role === 'executive') {
-              select.innerHTML += \`<option value="\${u.email}">\${roleIcons[u.role]} \${u.name} (\${roleLabels[u.role]})</option>\`;
-            }
-          });
-        } catch (err) {
-          console.error('Failed to load users:', err);
-        }
-      }
-      
+      // Login functions with password
       document.getElementById('login-form').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const email = document.getElementById('login-user-select').value;
+        const email = document.getElementById('login-email').value;
+        const password = document.getElementById('login-password').value;
         const errorDiv = document.getElementById('login-error');
         
-        if (!email) {
-          errorDiv.textContent = 'ユーザーを選択してください';
+        if (!email || !password) {
+          errorDiv.textContent = 'メールアドレスとパスワードを入力してください';
           errorDiv.classList.remove('hidden');
           return;
         }
         
         try {
-          await axios.post('/api/auth/login', { email });
+          await axios.post('/api/auth/login', { email, password });
           closeLoginModal();
           window.location.reload();
         } catch (err) {
