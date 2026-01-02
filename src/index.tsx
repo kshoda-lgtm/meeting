@@ -214,12 +214,14 @@ app.get('/', (c) => {
     </div>
     
     <!-- Meeting Type Filters -->
-    <div class="flex space-x-2 mb-6">
+    <div class="flex flex-wrap gap-2 mb-6">
       <button onclick="filterMeetings('')" class="filter-btn px-4 py-2 rounded-lg bg-blue-600 text-white" data-filter="">すべて</button>
       <button onclick="filterMeetings('team')" class="filter-btn px-4 py-2 rounded-lg bg-white text-gray-700 border" data-filter="team">チームMTG</button>
       <button onclick="filterMeetings('headquarters')" class="filter-btn px-4 py-2 rounded-lg bg-white text-gray-700 border" data-filter="headquarters">本部会議</button>
       <button onclick="filterMeetings('strategy')" class="filter-btn px-4 py-2 rounded-lg bg-white text-gray-700 border" data-filter="strategy">戦略会議</button>
       <button onclick="filterMeetings('all-hands')" class="filter-btn px-4 py-2 rounded-lg bg-white text-gray-700 border" data-filter="all-hands">全体会議</button>
+      <button onclick="filterMeetings('one-on-one')" class="filter-btn px-4 py-2 rounded-lg bg-white text-gray-700 border" data-filter="one-on-one">1on1</button>
+      <button onclick="filterMeetings('other')" class="filter-btn px-4 py-2 rounded-lg bg-white text-gray-700 border" data-filter="other">その他</button>
     </div>
     
     <!-- Meeting List -->
@@ -301,6 +303,26 @@ app.get('/', (c) => {
                     <span class="font-semibold text-gray-800">全体会議</span>
                   </div>
                   <p class="text-xs text-gray-500">月1回、本部決定の要点共有、月次振り返り、横展開</p>
+                </div>
+              </label>
+              <label class="meeting-type-option cursor-pointer">
+                <input type="radio" name="meeting_type" value="5" class="hidden" onchange="onMeetingTypeChange(this)">
+                <div class="border-2 rounded-lg p-4 hover:border-pink-400 transition-colors border-l-4 border-l-pink-500">
+                  <div class="flex items-center mb-2">
+                    <i class="fas fa-user-friends text-pink-500 mr-2"></i>
+                    <span class="font-semibold text-gray-800">1on1</span>
+                  </div>
+                  <p class="text-xs text-gray-500">上司と部下の1対1ミーティング。成長支援・課題相談・フィードバック</p>
+                </div>
+              </label>
+              <label class="meeting-type-option cursor-pointer">
+                <input type="radio" name="meeting_type" value="6" class="hidden" onchange="onMeetingTypeChange(this)">
+                <div class="border-2 rounded-lg p-4 hover:border-gray-400 transition-colors border-l-4 border-l-gray-500">
+                  <div class="flex items-center mb-2">
+                    <i class="fas fa-ellipsis-h text-gray-500 mr-2"></i>
+                    <span class="font-semibold text-gray-800">その他</span>
+                  </div>
+                  <p class="text-xs text-gray-500">上記に当てはまらない会議。臨時会議・プロジェクト会議など</p>
                 </div>
               </label>
             </div>
@@ -435,14 +457,18 @@ app.get('/', (c) => {
           team: 'border-l-green-500',
           headquarters: 'border-l-blue-500',
           strategy: 'border-l-purple-500',
-          'all-hands': 'border-l-orange-500'
+          'all-hands': 'border-l-orange-500',
+          'one-on-one': 'border-l-pink-500',
+          'other': 'border-l-gray-500'
         };
         
         const typeIcons = {
           team: 'fa-users',
           headquarters: 'fa-building',
           strategy: 'fa-chess',
-          'all-hands': 'fa-globe'
+          'all-hands': 'fa-globe',
+          'one-on-one': 'fa-user-friends',
+          'other': 'fa-ellipsis-h'
         };
         
         const statusBadges = {
@@ -518,7 +544,9 @@ app.get('/', (c) => {
           '1': 'チームMTG',
           '2': '本部会議',
           '3': '戦略会議',
-          '4': '全体会議'
+          '4': '全体会議',
+          '5': '1on1',
+          '6': 'その他'
         };
         const today = dayjs();
         const weekNum = Math.ceil(today.date() / 7);
@@ -526,6 +554,10 @@ app.get('/', (c) => {
         
         if (radio.value === '4') { // All-hands
           suggestedTitle = \`全体会議 \${today.format('M')}月\`;
+        } else if (radio.value === '5') { // 1on1
+          suggestedTitle = \`1on1 \${today.format('M/D')}\`;
+        } else if (radio.value === '6') { // Other
+          suggestedTitle = '';
         }
         
         document.getElementById('meeting-title').value = suggestedTitle;
@@ -653,7 +685,7 @@ app.get('/', (c) => {
         const typeSelector = document.getElementById('meeting-type-selector');
         if (!typeSelector) return;
         
-        const typeSlugs = ['team', 'headquarters', 'strategy', 'all-hands'];
+        const typeSlugs = ['team', 'headquarters', 'strategy', 'all-hands', 'one-on-one', 'other'];
         typeSelector.querySelectorAll('.meeting-type-option').forEach((option, idx) => {
           const slug = typeSlugs[idx];
           const canCreate = canCreateMeetingType(slug);

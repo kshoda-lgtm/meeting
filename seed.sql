@@ -5,7 +5,9 @@ INSERT OR IGNORE INTO meeting_types (id, name, slug, description) VALUES
   (1, 'チームMTG', 'team', '常駐先単位で施策進捗・品質・来週コミット・提案のタネを整理'),
   (2, '本部会議', 'headquarters', 'リーダー/副リーダー。会社決定の共有・運用統制・横断詰まり解消'),
   (3, '戦略会議', 'strategy', 'V2。優先順位・配分・トレードオフ・重大判断に集中'),
-  (4, '全体会議', 'all-hands', '本部決定の要点共有、月次振り返り、横展開');
+  (4, '全体会議', 'all-hands', '本部決定の要点共有、月次振り返り、横展開'),
+  (5, '1on1', 'one-on-one', '上司と部下の1対1ミーティング。成長支援・課題相談・フィードバック'),
+  (6, 'その他', 'other', '上記に当てはまらない会議。臨時会議・プロジェクト会議など');
 
 -- Insert demo organization
 INSERT OR IGNORE INTO organizations (id, name) VALUES (1, 'VEXUM株式会社');
